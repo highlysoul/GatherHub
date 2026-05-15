@@ -3,18 +3,22 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type DateFilter = "today" | "tomorrow" | "this week" | "custom" | null;
 type TimeFilter = "day" | "night" | null;
+
+const { width } = Dimensions.get("window");
 
 const PRICE_OPTIONS = [500, 1000, 1500, 2500, 3500, 4500, 5500];
 const BAR_HEIGHTS = [50, 58, 68, 82, 68, 58, 60];
@@ -51,138 +55,175 @@ export default function Filter() {
   };
 
   return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={true}
-      bounces={false}
-      overScrollMode="never"
-    >
-      <View style={styles.circleTop} />
-      <View style={styles.circleBottomLeft} />
-      <Pressable style={styles.backButton} onPress={goHome} hitSlop={12}>
-        <Ionicons name="chevron-back" size={30} color="#163525" />
-      </Pressable>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        <View style={styles.circleTop} />
+        <View style={styles.circleBottomLeft} />
 
-      <Text style={styles.title}>Filter</Text>
+        <View style={styles.header}>
+          <Pressable
+            style={styles.backButton}
+            onPress={goHome}
+            hitSlop={12}
+          >
+            <Ionicons name="chevron-back" size={24} color="#163525" />
+          </Pressable>
 
-      <View style={styles.form}>
-        <Text style={styles.label}>Location</Text>
-        <View style={styles.row}>
-          <FilterChip
-            icon="locate-outline"
-            label="Current location"
-            selected={useCurrentLocation}
-            onPress={() => setUseCurrentLocation((value) => !value)}
-          />
+          <Text style={styles.title}>Filter</Text>
 
-          <View style={styles.searchBox}>
-            <Ionicons name="search-outline" size={13} color="#8fc5aa" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Find location"
-              placeholderTextColor="#8fc5aa"
-              value={location}
-              onChangeText={(value) => {
-                setLocation(value);
-                setUseCurrentLocation(false);
-              }}
+          <View style={{ width: 36 }} />
+        </View>
+
+        <View style={styles.form}>
+          <Text style={styles.label}>Location</Text>
+
+          <View style={styles.row}>
+            <FilterChip
+              icon="locate-outline"
+              label="Current location"
+              selected={useCurrentLocation}
+              onPress={() => setUseCurrentLocation((value) => !value)}
+            />
+
+            <View style={styles.searchBox}>
+              <Ionicons
+                name="search-outline"
+                size={14}
+                color="#8fc5aa"
+              />
+
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Find location"
+                placeholderTextColor="#8fc5aa"
+                value={location}
+                onChangeText={(value) => {
+                  setLocation(value);
+                  setUseCurrentLocation(false);
+                }}
+              />
+            </View>
+          </View>
+
+          <Text style={styles.label}>Date</Text>
+
+          <View style={styles.row}>
+            <FilterChip
+              label="Today"
+              selected={date === "today"}
+              onPress={() => setDate("today")}
+            />
+
+            <FilterChip
+              label="Tomorrow"
+              selected={date === "tomorrow"}
+              onPress={() => setDate("tomorrow")}
+            />
+
+            <FilterChip
+              label="This week"
+              selected={date === "this week"}
+              onPress={() => setDate("this week")}
             />
           </View>
-        </View>
 
-        <Text style={styles.label}>Date</Text>
-        <View style={styles.row}>
-          <FilterChip
-            label="Today"
-            selected={date === "today"}
-            onPress={() => setDate("today")}
-          />
-          <FilterChip
-            label="Tomorrow"
-            selected={date === "tomorrow"}
-            onPress={() => setDate("tomorrow")}
-          />
-          <FilterChip
-            label="This week"
-            selected={date === "this week"}
-            onPress={() => setDate("this week")}
-          />
-        </View>
+          <View style={styles.centerRow}>
+            <FilterChip
+              icon="calendar"
+              label="Choose date"
+              selected={date === "custom"}
+              onPress={() => setDate("custom")}
+            />
+          </View>
 
-        <View style={styles.centerRow}>
-          <FilterChip
-            icon="calendar"
-            label="Choose date"
-            selected={date === "custom"}
-            onPress={() => setDate("custom")}
-          />
-        </View>
+          <Text style={styles.label}>Time of date</Text>
 
-        <Text style={styles.label}>Time of date</Text>
-        <View style={styles.row}>
-          <FilterChip
-            label="Day"
-            selected={timeOfDay === "day"}
-            onPress={() => setTimeOfDay("day")}
-          />
-          <FilterChip
-            label="Night"
-            selected={timeOfDay === "night"}
-            onPress={() => setTimeOfDay("night")}
-          />
-          <FilterChip
-            icon="time-outline"
-            label="Choose time"
-            selected={false}
-            onPress={() => setTimeOfDay(timeOfDay === "day" ? "night" : "day")}
-          />
-        </View>
+          <View style={styles.row}>
+            <FilterChip
+              label="Day"
+              selected={timeOfDay === "day"}
+              onPress={() => setTimeOfDay("day")}
+            />
 
-        <Text style={styles.priceTitle}>Price (free-500)</Text>
+            <FilterChip
+              label="Night"
+              selected={timeOfDay === "night"}
+              onPress={() => setTimeOfDay("night")}
+            />
 
-        <View style={styles.priceBars}>
-          {PRICE_OPTIONS.map((price, index) => {
-            const selected = price <= maxPrice;
+            <FilterChip
+              icon="time-outline"
+              label="Choose time"
+              selected={false}
+              onPress={() =>
+                setTimeOfDay(
+                  timeOfDay === "day" ? "night" : "day"
+                )
+              }
+            />
+          </View>
 
-            return (
-              <Pressable
-                key={price}
-                style={styles.priceItem}
-                onPress={() => setMaxPrice(price)}
-              >
-                <LinearGradient
-                  colors={
-                    selected ? ["#3AAE87", "#2F85A9"] : ["#2D8059", "#2B7652"]
-                  }
-                  style={[styles.priceBar, { height: BAR_HEIGHTS[index] }]}
-                />
-                <Text style={styles.priceLabel}>Rp{price}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+          <Text style={styles.priceTitle}>Price (free-500)</Text>
 
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.resetButton]}
-            onPress={resetFilters}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.actionText}>Reset</Text>
-          </TouchableOpacity>
+          <View style={styles.priceBars}>
+            {PRICE_OPTIONS.map((price, index) => {
+              const selected = price <= maxPrice;
 
-          <TouchableOpacity activeOpacity={0.85} onPress={applyFilters}>
-            <LinearGradient
-              colors={["#3AAE87", "#2C6FA4"]}
-              style={styles.actionButton}
+              return (
+                <Pressable
+                  key={price}
+                  style={styles.priceItem}
+                  onPress={() => setMaxPrice(price)}
+                >
+                  <LinearGradient
+                    colors={
+                      selected
+                        ? ["#3AAE87", "#2F85A9"]
+                        : ["#2D8059", "#2B7652"]
+                    }
+                    style={[
+                      styles.priceBar,
+                      { height: BAR_HEIGHTS[index] },
+                    ]}
+                  />
+
+                  <Text style={styles.priceLabel}>
+                    Rp{price}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.resetButton]}
+              onPress={resetFilters}
+              activeOpacity={0.85}
             >
-              <Text style={styles.actionText}>Apply</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <Text style={styles.actionText}>Reset</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={applyFilters}
+            >
+              <LinearGradient
+                colors={["#3AAE87", "#2C6FA4"]}
+                style={styles.actionButton}
+              >
+                <Text style={styles.actionText}>Apply</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -200,7 +241,11 @@ function FilterChip({
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
       <LinearGradient
-        colors={selected ? ["#54C49A", "#2E83A5"] : ["#2E875E", "#256E4E"]}
+        colors={
+          selected
+            ? ["#54C49A", "#2E83A5"]
+            : ["#2E875E", "#256E4E"]
+        }
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.chip}
@@ -212,7 +257,13 @@ function FilterChip({
             color={selected ? "#ffffff" : "#9FDFC0"}
           />
         )}
-        <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+
+        <Text
+          style={[
+            styles.chipText,
+            selected && styles.chipTextSelected,
+          ]}
+        >
           {label}
         </Text>
       </LinearGradient>
@@ -221,6 +272,11 @@ function FilterChip({
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#206A40",
+  },
+
   root: {
     flex: 1,
     backgroundColor: "#206A40",
@@ -228,22 +284,20 @@ const styles = StyleSheet.create({
 
   content: {
     flexGrow: 1,
-    minHeight: "100%",
-    backgroundColor: "#206A40",
-    paddingHorizontal: 44,
-    paddingTop: 42,
-    paddingBottom: 12,
+    paddingHorizontal: width < 380 ? 22 : 30,
+    paddingTop: 12,
+    paddingBottom: 40,
   },
 
   circleTop: {
     position: "absolute",
-    width: 360,
-    height: 360,
-    borderRadius: 220,
+    width: 340,
+    height: 340,
+    borderRadius: 200,
     backgroundColor: "#E86D55",
-    top: -210,
+    top: -180,
     right: -120,
-    opacity: 0.55,
+    opacity: 0.5,
   },
 
   circleBottomLeft: {
@@ -257,37 +311,38 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
 
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+
   backButton: {
-    width: 35,
-    height: 35,
-    borderRadius: 5,
-    backgroundColor: "rgba(255,255,255,0.72)",
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.75)",
     alignItems: "center",
     justifyContent: "center",
-    zIndex: 20,
-    elevation: 20,
   },
 
   title: {
-    marginTop: -40,
     color: "#ffffff",
-    fontSize: 34,
+    fontSize: width < 380 ? 28 : 34,
     fontWeight: "700",
-    textAlign: "center",
   },
 
   form: {
     width: "100%",
-    maxWidth: 360,
     alignSelf: "center",
-    marginTop: 22,
   },
 
   label: {
     color: "#DDF0E6",
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "600",
-    marginBottom: 16,
+    marginBottom: 14,
     marginTop: 8,
   },
 
@@ -305,18 +360,13 @@ const styles = StyleSheet.create({
   },
 
   chip: {
-    minHeight: 30,
-    paddingHorizontal: 11,
-    borderRadius: 7,
+    minHeight: 34,
+    paddingHorizontal: 14,
+    borderRadius: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    elevation: 3,
+    gap: 5,
   },
 
   chipText: {
@@ -330,19 +380,15 @@ const styles = StyleSheet.create({
   },
 
   searchBox: {
-    width: 200,
-    height: 28,
-    borderRadius: 7,
+    flex: 1,
+    minWidth: 160,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: "#2D8059",
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.22,
-    shadowRadius: 6,
-    elevation: 5,
+    gap: 6,
   },
 
   searchInput: {
@@ -356,58 +402,47 @@ const styles = StyleSheet.create({
     color: "#DDF0E6",
     fontSize: 15,
     fontWeight: "600",
-    marginTop: 12,
-    marginBottom: 10,
+    marginTop: 14,
+    marginBottom: 14,
   },
 
   priceBars: {
-    height: 92,
+    height: 110,
     flexDirection: "row",
     alignItems: "flex-end",
-    justifyContent: "center",
-    gap: 10,
+    justifyContent: "space-between",
   },
 
   priceItem: {
     alignItems: "center",
-    gap: 6,
+    flex: 1,
   },
 
   priceBar: {
-    width: 22,
-    borderRadius: 7,
-    opacity: 0.96,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    elevation: 3,
+    width: width < 380 ? 18 : 22,
+    borderRadius: 8,
   },
 
   priceLabel: {
     color: "#CFE7DB",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
+    marginTop: 6,
   },
 
   actions: {
     flexDirection: "row",
     justifyContent: "center",
     gap: 15,
-    marginTop: 12,
+    marginTop: 28,
   },
 
   actionButton: {
-    width: 90,
-    height: 35,
-    borderRadius: 6,
+    width: 110,
+    height: 42,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.22,
-    shadowRadius: 4,
-    elevation: 4,
   },
 
   resetButton: {
@@ -416,7 +451,7 @@ const styles = StyleSheet.create({
 
   actionText: {
     color: "#DCEDE6",
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "700",
   },
 });
