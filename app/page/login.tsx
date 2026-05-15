@@ -8,6 +8,8 @@ import {
   Modal,
   Platform,
   Pressable,
+  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -15,171 +17,453 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../services/api";
 
 const { width, height } = Dimensions.get("window");
 
 export default function Login() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [emailFocused, setEmailFocused] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [password, setPassword] =
+    useState("");
 
-  const [showError, setShowError] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [emailFocused, setEmailFocused] =
+    useState(false);
+
+  const [
+    passwordFocused,
+    setPasswordFocused,
+  ] = useState(false);
+
+  const [showModal, setShowModal] =
+    useState(false);
+
+  const [modalTitle, setModalTitle] =
+    useState("");
+
+  const [modalMessage, setModalMessage] =
+    useState("");
+
+  const [isSuccess, setIsSuccess] =
+    useState(false);
 
   const { login } = useAuth();
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      setErrorMessage("Please fill in all fields.");
-      setShowError(true);
+    if (
+      !email.trim() ||
+      !password.trim()
+    ) {
+      setModalTitle("Login Failed");
+      setModalMessage(
+        "Please fill in all fields."
+      );
+      setIsSuccess(false);
+      setShowModal(true);
       return;
     }
 
-    const user = await login(email, password);
+    const user = await login(
+      email,
+      password
+    );
 
     if (!user) {
-      setErrorMessage("Email or password incorrect!");
-      setShowError(true);
+      setModalTitle("Login Failed");
+      setModalMessage(
+        "Email or password incorrect!"
+      );
+      setIsSuccess(false);
+      setShowModal(true);
       return;
     }
 
-    router.replace("/page/home");
+    const {
+      data: {
+        user: currentUser,
+      },
+    } = await supabase.auth.getUser();
+
+    if (!currentUser) {
+      setModalTitle("Login Failed");
+      setModalMessage(
+        "User not found."
+      );
+      setIsSuccess(false);
+      setShowModal(true);
+      return;
+    }
+
+    const {
+      data: profileData,
+      error,
+    } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", currentUser.id)
+      .single();
+
+    if (error) {
+      setModalTitle("Login Failed");
+      setModalMessage(error.message);
+      setIsSuccess(false);
+      setShowModal(true);
+      return;
+    }
+
+    setModalTitle(
+      profileData?.role === "admin"
+        ? "Welcome Admin"
+        : "Login Successful"
+    );
+
+    setModalMessage(
+      profileData?.role === "admin"
+        ? `Welcome back, ${profileData?.full_name}!`
+        : `Hello ${profileData?.full_name}, enjoy GatherHub!`
+    );
+
+    setIsSuccess(true);
+    setShowModal(true);
+
+    setTimeout(() => {
+      router.replace("/page/home");
+    }, 1800);
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <View style={styles.circleLeft} />
-      <View style={styles.circleRight} />
-      <View style={styles.circleBottomLeft} />
-      <View style={styles.circleBottomRight} />
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        style={styles.root}
+        behavior={
+          Platform.OS === "ios"
+            ? "padding"
+            : undefined
+        }
+      >
+        <ScrollView
+          contentContainerStyle={
+            styles.scrollContent
+          }
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={
+            false
+          }
+        >
+          <View
+            style={styles.circleLeft}
+          />
+          <View
+            style={styles.circleRight}
+          />
+          <View
+            style={
+              styles.circleBottomLeft
+            }
+          />
+          <View
+            style={
+              styles.circleBottomRight
+            }
+          />
 
-      <View style={styles.center}>
-        <Text style={styles.logo}>GatherHub</Text>
+          <View style={styles.center}>
+            <Text style={styles.logo}>
+              GatherHub
+            </Text>
 
-        <View style={styles.card}>
-          <Text style={styles.title}>SIGN IN</Text>
+            <View style={styles.card}>
+              <Text
+                style={styles.title}
+              >
+                SIGN IN
+              </Text>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Enter Your Email</Text>
-            <TextInput
-              style={[styles.input, emailFocused && styles.inputFocused]}
-              placeholder="name@gmail.com"
-              placeholderTextColor="#aac4b4"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              value={email}
-              onChangeText={setEmail}
-              onFocus={() => setEmailFocused(true)}
-              onBlur={() => setEmailFocused(false)}
-            />
+              <View
+                style={
+                  styles.fieldGroup
+                }
+              >
+                <Text
+                  style={styles.label}
+                >
+                  Enter Your Email
+                </Text>
+
+                <TextInput
+                  style={[
+                    styles.input,
+                    emailFocused &&
+                      styles.inputFocused,
+                  ]}
+                  placeholder="name@gmail.com"
+                  placeholderTextColor="#aac4b4"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={email}
+                  onChangeText={setEmail}
+                  onFocus={() =>
+                    setEmailFocused(
+                      true
+                    )
+                  }
+                  onBlur={() =>
+                    setEmailFocused(
+                      false
+                    )
+                  }
+                />
+              </View>
+
+              <View
+                style={
+                  styles.fieldGroup
+                }
+              >
+                <Text
+                  style={styles.label}
+                >
+                  Enter Your Password
+                </Text>
+
+                <TextInput
+                  style={[
+                    styles.input,
+                    passwordFocused &&
+                      styles.inputFocused,
+                  ]}
+                  placeholder="Password....."
+                  placeholderTextColor="#aac4b4"
+                  secureTextEntry
+                  value={password}
+                  onChangeText={
+                    setPassword
+                  }
+                  onFocus={() =>
+                    setPasswordFocused(
+                      true
+                    )
+                  }
+                  onBlur={() =>
+                    setPasswordFocused(
+                      false
+                    )
+                  }
+                />
+              </View>
+
+              <TouchableOpacity
+                onPress={handleLogin}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={[
+                    "#A9E5BC",
+                    "#3FA16F",
+                  ]}
+                  start={{
+                    x: 0,
+                    y: 0,
+                  }}
+                  end={{
+                    x: 1,
+                    y: 1,
+                  }}
+                  style={
+                    styles.loginButton
+                  }
+                >
+                  <Text
+                    style={
+                      styles.loginButtonText
+                    }
+                  >
+                    Login
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <View
+                style={
+                  styles.signupRow
+                }
+              >
+                <Text
+                  style={
+                    styles.signupText
+                  }
+                >
+                  don't have an
+                  account?{" "}
+                </Text>
+
+                <Pressable
+                  onPress={() =>
+                    router.push(
+                      "/page/register"
+                    )
+                  }
+                >
+                  <Text
+                    style={
+                      styles.signupLink
+                    }
+                  >
+                    SIGN UP
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
           </View>
+        </ScrollView>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Enter Your Password</Text>
-            <TextInput
-              style={[styles.input, passwordFocused && styles.inputFocused]}
-              placeholder="Password....."
-              placeholderTextColor="#aac4b4"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              onFocus={() => setPasswordFocused(true)}
-              onBlur={() => setPasswordFocused(false)}
-            />
-          </View>
-
-          <TouchableOpacity onPress={handleLogin} activeOpacity={0.8}>
-            <LinearGradient
-              colors={["#A9E5BC", "#3FA16F"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.loginButton}
-            >
-              <Text style={styles.loginButtonText}>Login</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <View style={styles.signupRow}>
-            <Text style={styles.signupText}>don't have an account? </Text>
-
-            <Pressable onPress={() => router.push("/page/register")}>
-              <Text style={styles.signupLink}>SIGN UP</Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
-
-      <Modal transparent visible={showError} animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <LinearGradient
-              colors={["#FF826F", "#B93224"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.iconWrapper}
-            >
-              <Ionicons name="close" size={34} color="#fff" />
-            </LinearGradient>
-
-            <Text style={styles.modalTitle}>Login Failed</Text>
-
-            <Text style={styles.modalText}>{errorMessage}</Text>
-
-            <TouchableOpacity
-              onPress={() => setShowError(false)}
-              activeOpacity={0.8}
+        <Modal
+          transparent
+          visible={showModal}
+          animationType="fade"
+        >
+          <View
+            style={
+              styles.modalOverlay
+            }
+          >
+            <View
+              style={
+                styles.modalContainer
+              }
             >
               <LinearGradient
-                colors={["#A9E5BC", "#3FA16F"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.modalButton}
+                colors={
+                  isSuccess
+                    ? [
+                        "#75DFA8",
+                        "#2F9B68",
+                      ]
+                    : [
+                        "#FF826F",
+                        "#B93224",
+                      ]
+                }
+                start={{
+                  x: 0,
+                  y: 0,
+                }}
+                end={{
+                  x: 1,
+                  y: 1,
+                }}
+                style={
+                  styles.iconWrapper
+                }
               >
-                <Text style={styles.modalButtonText}>Try Again</Text>
+                <Ionicons
+                  name={
+                    isSuccess
+                      ? "checkmark"
+                      : "close"
+                  }
+                  size={34}
+                  color="#fff"
+                />
               </LinearGradient>
-            </TouchableOpacity>
+
+              <Text
+                style={
+                  styles.modalTitle
+                }
+              >
+                {modalTitle}
+              </Text>
+
+              <Text
+                style={
+                  styles.modalText
+                }
+              >
+                {modalMessage}
+              </Text>
+
+              <TouchableOpacity
+                onPress={() =>
+                  setShowModal(false)
+                }
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={[
+                    "#A9E5BC",
+                    "#3FA16F",
+                  ]}
+                  start={{
+                    x: 0,
+                    y: 0,
+                  }}
+                  end={{
+                    x: 1,
+                    y: 1,
+                  }}
+                  style={
+                    styles.modalButton
+                  }
+                >
+                  <Text
+                    style={
+                      styles.modalButtonText
+                    }
+                  >
+                    OK
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
-    </KeyboardAvoidingView>
+        </Modal>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#2F6B4F",
+  },
+
   root: {
     flex: 1,
     backgroundColor: "#2F6B4F",
   },
 
+  scrollContent: {
+    minHeight: height,
+    justifyContent: "center",
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+  },
+
   center: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
 
   circleLeft: {
     position: "absolute",
-    width: 400,
-    height: 400,
-    borderRadius: 300,
+    width: width * 0.9,
+    height: width * 0.9,
+    borderRadius: 999,
     backgroundColor: "#1F5235",
-    top: -80,
-    left: -80,
+    top: -120,
+    left: -120,
   },
 
   circleRight: {
     position: "absolute",
-    width: 330,
-    height: 350,
-    borderRadius: 240,
+    width: width * 0.8,
+    height: width * 0.8,
+    borderRadius: 999,
     backgroundColor: "#E37059",
-    top: -80,
-    right: -80,
+    top: -100,
+    right: -100,
   },
 
   circleBottomLeft: {
@@ -188,8 +472,8 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 999,
     backgroundColor: "#A9C9A0",
-    bottom: -50,
-    left: -50,
+    bottom: -60,
+    left: -60,
     opacity: 0.75,
   },
 
@@ -199,61 +483,65 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 999,
     backgroundColor: "#49BA8B",
-    bottom: -30,
+    bottom: -40,
     right: -40,
     opacity: 0.8,
   },
 
   logo: {
-    fontSize: 40,
+    fontSize: width < 380 ? 34 : 42,
     fontWeight: "bold",
     color: "#fff",
-    marginBottom: 20,
+    marginBottom: 24,
     zIndex: 10,
   },
 
   card: {
-    width: width * 0.4,
+    width: "100%",
+    maxWidth: 420,
     backgroundColor: "#216D42",
-    borderRadius: 12,
+    borderRadius: 20,
     paddingVertical: 28,
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     alignItems: "center",
     zIndex: 10,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
     shadowOpacity: 0.2,
     shadowRadius: 16,
     elevation: 10,
   },
 
   title: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 20,
+    fontWeight: "700",
     color: "#e8f5ee",
     letterSpacing: 3,
-    marginBottom: 20,
+    marginBottom: 24,
   },
 
   fieldGroup: {
     width: "100%",
-    marginBottom: 14,
+    marginBottom: 16,
   },
 
   label: {
     fontSize: 13,
     fontWeight: "bold",
     color: "#d4ede0",
-    marginBottom: 5,
+    marginBottom: 7,
   },
 
   input: {
     width: "100%",
-    height: 38,
+    height: 48,
     backgroundColor: "#ffffff",
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    fontSize: 13,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    fontSize: 14,
     color: "#2d5a3d",
     borderWidth: 2,
     borderColor: "transparent",
@@ -264,15 +552,17 @@ const styles = StyleSheet.create({
   },
 
   loginButton: {
-    marginTop: 6,
-    width: 168,
-    minWidth: 168,
-    height: 38,
+    marginTop: 12,
+    width: width < 380 ? 220 : 260,
+    height: 48,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.25,
     shadowRadius: 7,
     elevation: 7,
@@ -281,14 +571,15 @@ const styles = StyleSheet.create({
   loginButtonText: {
     color: "#ffffff",
     fontSize: 16,
-    fontWeight: "600",
-    letterSpacing: 0.3,
+    fontWeight: "700",
   },
 
   signupRow: {
     flexDirection: "row",
-    marginTop: 16,
+    marginTop: 20,
     alignItems: "center",
+    flexWrap: "wrap",
+    justifyContent: "center",
   },
 
   signupText: {
@@ -304,13 +595,16 @@ const styles = StyleSheet.create({
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor:
+      "rgba(0,0,0,0.45)",
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 20,
   },
 
   modalContainer: {
-    width: 450,
+    width: "100%",
+    maxWidth: 340,
     backgroundColor: "#296048",
     borderRadius: 24,
     paddingVertical: 30,
@@ -332,6 +626,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#fff",
     marginBottom: 10,
+    textAlign: "center",
   },
 
   modalText: {
@@ -343,21 +638,16 @@ const styles = StyleSheet.create({
   },
 
   modalButton: {
-    minWidth: 132,
-    height: 38,
+    minWidth: 140,
+    height: 42,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 7,
-    elevation: 7,
   },
 
   modalButtonText: {
     color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "700",
   },
 });
