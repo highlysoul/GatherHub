@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
+
 import {
   Dimensions,
   KeyboardAvoidingView,
@@ -16,6 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { supabase } from "../services/api";
 
 const { width, height } =
@@ -38,8 +40,18 @@ export default function Register() {
     setConfirmPassword,
   ] = useState("");
 
+  const [showPassword, setShowPassword] =
+    useState(false);
+
+  const [
+    showConfirmPassword,
+    setShowConfirmPassword,
+  ] = useState(false);
+
   const [focused, setFocused] =
-    useState<string | null>(null);
+    useState<string | null>(
+      null
+    );
 
   const [showModal, setShowModal] =
     useState(false);
@@ -53,131 +65,157 @@ export default function Register() {
   const [isSuccess, setIsSuccess] =
     useState(false);
 
-  const handleRegister = async () => {
-    const trimmedName = name.trim();
+  const handleRegister =
+    async () => {
+      const trimmedName =
+        name.trim();
 
-    const trimmedEmail =
-      email.trim();
+      const trimmedEmail =
+        email.trim();
 
-    if (
-      !trimmedName ||
-      !trimmedEmail ||
-      !password.trim() ||
-      !confirmPassword.trim()
-    ) {
+      if (
+        !trimmedName ||
+        !trimmedEmail ||
+        !password.trim() ||
+        !confirmPassword.trim()
+      ) {
+        setModalTitle(
+          "Registration Failed"
+        );
+
+        setModalMessage(
+          "Please fill in all fields."
+        );
+
+        setIsSuccess(false);
+
+        setShowModal(true);
+
+        return;
+      }
+
+      if (
+        password !==
+        confirmPassword
+      ) {
+        setModalTitle(
+          "Registration Failed"
+        );
+
+        setModalMessage(
+          "Passwords do not match."
+        );
+
+        setIsSuccess(false);
+
+        setShowModal(true);
+
+        return;
+      }
+
+      const {
+        data,
+        error,
+      } =
+        await supabase.auth.signUp(
+          {
+            email:
+              trimmedEmail,
+            password,
+            options: {
+              data: {
+                full_name:
+                  trimmedName,
+                role: DEFAULT_ROLE,
+              },
+            },
+          }
+        );
+
+      if (
+        error ||
+        !data.user
+      ) {
+        setModalTitle(
+          "Registration Failed"
+        );
+
+        setModalMessage(
+          error?.message ||
+            "Something went wrong"
+        );
+
+        setIsSuccess(false);
+
+        setShowModal(true);
+
+        return;
+      }
+
+      const profileData = {
+        id: data.user.id,
+        email:
+          trimmedEmail,
+        role: DEFAULT_ROLE,
+        full_name:
+          trimmedName,
+        photo: null,
+      };
+
+      const {
+        error: profileError,
+      } = await supabase
+        .from("profiles")
+        .upsert(profileData, {
+          onConflict: "id",
+        });
+
+      if (profileError) {
+        setModalTitle(
+          "Registration Failed"
+        );
+
+        setModalMessage(
+          profileError.message
+        );
+
+        setIsSuccess(false);
+
+        setShowModal(true);
+
+        return;
+      }
+
       setModalTitle(
-        "Registration Failed"
+        "Registration Successful"
       );
 
       setModalMessage(
-        "Please fill in all fields."
+        "Your account has been created successfully."
       );
 
-      setIsSuccess(false);
+      setIsSuccess(true);
+
       setShowModal(true);
-      return;
-    }
 
-    if (
-      password !== confirmPassword
-    ) {
-      setModalTitle(
-        "Registration Failed"
-      );
-
-      setModalMessage(
-        "Passwords do not match."
-      );
-
-      setIsSuccess(false);
-      setShowModal(true);
-      return;
-    }
-
-    const { data, error } =
-      await supabase.auth.signUp({
-        email: trimmedEmail,
-        password,
-        options: {
-          data: {
-            full_name:
-              trimmedName,
-            role: DEFAULT_ROLE,
-          },
-        },
-      });
-
-    if (error || !data.user) {
-      setModalTitle(
-        "Registration Failed"
-      );
-
-      setModalMessage(
-        error?.message ||
-          "Something went wrong"
-      );
-
-      setIsSuccess(false);
-      setShowModal(true);
-      return;
-    }
-
-    const profileData = {
-      id: data.user.id,
-      email: trimmedEmail,
-      role: DEFAULT_ROLE,
-      full_name: trimmedName,
-      photo: null,
+      setTimeout(() => {
+        router.replace(
+          "/page/login"
+        );
+      }, 1800);
     };
-
-    const {
-      error: profileError,
-    } = await supabase
-      .from("profiles")
-      .upsert(profileData, {
-        onConflict: "id",
-      });
-
-    if (profileError) {
-      setModalTitle(
-        "Registration Failed"
-      );
-
-      setModalMessage(
-        profileError.message
-      );
-
-      setIsSuccess(false);
-      setShowModal(true);
-      return;
-    }
-
-    setModalTitle(
-      "Registration Successful"
-    );
-
-    setModalMessage(
-      "Your account has been created successfully."
-    );
-
-    setIsSuccess(true);
-    setShowModal(true);
-
-    setTimeout(() => {
-      router.replace(
-        "/page/login"
-      );
-    }, 1800);
-  };
 
   return (
     <SafeAreaView
-      style={styles.safeArea}
+      style={
+        styles.safeArea
+      }
     >
       <KeyboardAvoidingView
         style={styles.root}
         behavior={
-          Platform.OS === "ios"
+          Platform.OS ===
+          "ios"
             ? "padding"
             : undefined
         }
@@ -192,11 +230,15 @@ export default function Register() {
           }
         >
           <View
-            style={styles.circleLeft}
+            style={
+              styles.circleLeft
+            }
           />
 
           <View
-            style={styles.circleRight}
+            style={
+              styles.circleRight
+            }
           />
 
           <View
@@ -211,25 +253,42 @@ export default function Register() {
             }
           />
 
-          <View style={styles.center}>
-            <Text style={styles.logo}>
+          <View
+            style={
+              styles.center
+            }
+          >
+            <Text
+              style={
+                styles.logo
+              }
+            >
               GatherHub
             </Text>
 
-            <View style={styles.card}>
+            <View
+              style={
+                styles.card
+              }
+            >
               <Text
-                style={styles.title}
+                style={
+                  styles.title
+                }
               >
                 SIGN UP
               </Text>
 
+              {/* NAME */}
               <View
                 style={
                   styles.fieldGroup
                 }
               >
                 <Text
-                  style={styles.label}
+                  style={
+                    styles.label
+                  }
                 >
                   Enter Your Name
                 </Text>
@@ -244,7 +303,9 @@ export default function Register() {
                   placeholder="Name....."
                   placeholderTextColor="#aac4b4"
                   value={name}
-                  onChangeText={setName}
+                  onChangeText={
+                    setName
+                  }
                   onFocus={() =>
                     setFocused(
                       "name"
@@ -258,13 +319,16 @@ export default function Register() {
                 />
               </View>
 
+              {/* EMAIL */}
               <View
                 style={
                   styles.fieldGroup
                 }
               >
                 <Text
-                  style={styles.label}
+                  style={
+                    styles.label
+                  }
                 >
                   Enter Your Email
                 </Text>
@@ -281,7 +345,9 @@ export default function Register() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={
+                    setEmail
+                  }
                   onFocus={() =>
                     setFocused(
                       "email"
@@ -295,87 +361,162 @@ export default function Register() {
                 />
               </View>
 
+              {/* PASSWORD */}
               <View
                 style={
                   styles.fieldGroup
                 }
               >
                 <Text
-                  style={styles.label}
+                  style={
+                    styles.label
+                  }
                 >
                   Enter Your Password
                 </Text>
 
-                <TextInput
-                  style={[
-                    styles.input,
-                    focused ===
-                      "password" &&
-                      styles.inputFocused,
-                  ]}
-                  placeholder="Password....."
-                  placeholderTextColor="#aac4b4"
-                  secureTextEntry
-                  value={password}
-                  onChangeText={
-                    setPassword
-                  }
-                  onFocus={() =>
-                    setFocused(
-                      "password"
-                    )
-                  }
-                  onBlur={() =>
-                    setFocused(
-                      null
-                    )
-                  }
-                />
+                <View>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      focused ===
+                        "password" &&
+                        styles.inputFocused,
+                      {
+                        paddingRight: 50,
+                      },
+                    ]}
+                    placeholder="Password....."
+                    placeholderTextColor="#aac4b4"
+                    secureTextEntry={
+                      !showPassword
+                    }
+                    value={
+                      password
+                    }
+                    onChangeText={
+                      setPassword
+                    }
+                    onFocus={() =>
+                      setFocused(
+                        "password"
+                      )
+                    }
+                    onBlur={() =>
+                      setFocused(
+                        null
+                      )
+                    }
+                  />
+
+                  <TouchableOpacity
+                    onPress={() =>
+                      setShowPassword(
+                        !showPassword
+                      )
+                    }
+                    style={{
+                      position:
+                        "absolute",
+                      right: 14,
+                      top: 13,
+                    }}
+                  >
+                    <Ionicons
+                      name={
+                        showPassword
+                          ? "eye-off"
+                          : "eye"
+                      }
+                      size={22}
+                      color="#5B7C6F"
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
 
+              {/* CONFIRM PASSWORD */}
               <View
                 style={
                   styles.fieldGroup
                 }
               >
                 <Text
-                  style={styles.label}
+                  style={
+                    styles.label
+                  }
                 >
                   Confirm Your Password
                 </Text>
 
-                <TextInput
-                  style={[
-                    styles.input,
-                    focused ===
-                      "confirm" &&
-                      styles.inputFocused,
-                  ]}
-                  placeholder="Password....."
-                  placeholderTextColor="#aac4b4"
-                  secureTextEntry
-                  value={confirmPassword}
-                  onChangeText={
-                    setConfirmPassword
-                  }
-                  onFocus={() =>
-                    setFocused(
-                      "confirm"
-                    )
-                  }
-                  onBlur={() =>
-                    setFocused(
-                      null
-                    )
-                  }
-                />
+                <View>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      focused ===
+                        "confirm" &&
+                        styles.inputFocused,
+                      {
+                        paddingRight: 50,
+                      },
+                    ]}
+                    placeholder="Password....."
+                    placeholderTextColor="#aac4b4"
+                    secureTextEntry={
+                      !showConfirmPassword
+                    }
+                    value={
+                      confirmPassword
+                    }
+                    onChangeText={
+                      setConfirmPassword
+                    }
+                    onFocus={() =>
+                      setFocused(
+                        "confirm"
+                      )
+                    }
+                    onBlur={() =>
+                      setFocused(
+                        null
+                      )
+                    }
+                  />
+
+                  <TouchableOpacity
+                    onPress={() =>
+                      setShowConfirmPassword(
+                        !showConfirmPassword
+                      )
+                    }
+                    style={{
+                      position:
+                        "absolute",
+                      right: 14,
+                      top: 13,
+                    }}
+                  >
+                    <Ionicons
+                      name={
+                        showConfirmPassword
+                          ? "eye-off"
+                          : "eye"
+                      }
+                      size={22}
+                      color="#5B7C6F"
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
 
+              {/* BUTTON */}
               <TouchableOpacity
                 onPress={
                   handleRegister
                 }
-                activeOpacity={0.8}
+                activeOpacity={
+                  0.8
+                }
               >
                 <LinearGradient
                   colors={[
@@ -404,6 +545,7 @@ export default function Register() {
                 </LinearGradient>
               </TouchableOpacity>
 
+              {/* SIGN IN */}
               <View
                 style={
                   styles.signinRow
@@ -438,9 +580,12 @@ export default function Register() {
           </View>
         </ScrollView>
 
+        {/* MODAL */}
         <Modal
           transparent
-          visible={showModal}
+          visible={
+            showModal
+          }
           animationType="fade"
         >
           <View
@@ -506,9 +651,13 @@ export default function Register() {
 
               <TouchableOpacity
                 onPress={() =>
-                  setShowModal(false)
+                  setShowModal(
+                    false
+                  )
                 }
-                activeOpacity={0.8}
+                activeOpacity={
+                  0.8
+                }
               >
                 <LinearGradient
                   colors={[
@@ -696,7 +845,8 @@ const styles =
           : 260,
       height: 48,
       borderRadius: 999,
-      alignItems: "center",
+      alignItems:
+        "center",
       justifyContent:
         "center",
       shadowColor: "#000",
@@ -786,7 +936,8 @@ const styles =
       minWidth: 140,
       height: 42,
       borderRadius: 999,
-      alignItems: "center",
+      alignItems:
+        "center",
       justifyContent:
         "center",
     },

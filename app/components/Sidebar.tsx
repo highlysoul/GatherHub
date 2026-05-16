@@ -12,7 +12,7 @@ import { supabase } from "../services/api";
 
 type MenuItem = {
   label: string;
-  route: "/page/profile" | "/page/viewEvents" | "/page/createEvent" | "/page/viewTickets";
+  route: "/page/profile" | "/page/viewEvents" | "/page/viewTickets";
 };
 
 export default function Sidebar({ visible, onClose, role }: any) {
@@ -56,7 +56,6 @@ export default function Sidebar({ visible, onClose, role }: any) {
       ? [
           { label: "View My Profile", route: "/page/profile" },
           { label: "View My Events", route: "/page/viewEvents" },
-          { label: "Create an Event", route: "/page/createEvent" },
         ]
       : [
           { label: "View My Profile", route: "/page/profile" },

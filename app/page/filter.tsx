@@ -85,7 +85,7 @@ export default function Filter() {
           <View style={styles.row}>
             <FilterChip
               icon="locate-outline"
-              label="Current location"
+              label="Nearest location"
               selected={useCurrentLocation}
               onPress={() => setUseCurrentLocation((value) => !value)}
             />

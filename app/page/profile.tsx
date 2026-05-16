@@ -2,312 +2,406 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+
+import React, {
+  useEffect,
+  useState,
+} from "react";
+
 import {
-    ActivityIndicator,
-    Image,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+
+import { SafeAreaView } from "react-native-safe-area-context";
+
 import { supabase } from "../services/api";
 
-export default function ProfileScreen() {
-  const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [uploading, setUploading] = useState(false);
+export default function Profile() {
+  const [profile, setProfile] =
+    useState<any>(null);
 
-  const [userId, setUserId] = useState("");
-  const [email, setEmail] = useState("");
+  const [fullName, setFullName] =
+    useState("");
 
-  // SAVED DATA
-  const [savedName, setSavedName] = useState("");
-  const [savedPhoto, setSavedPhoto] =
-    useState<string | null>(null);
+  const [email, setEmail] =
+    useState("");
 
-  // EDIT DATA
-  const [fullName, setFullName] = useState("");
   const [photo, setPhoto] =
-    useState<string | null>(null);
-
-  // MODAL
-  const [showModal, setShowModal] =
-    useState(false);
-
-  const [modalTitle, setModalTitle] =
     useState("");
 
-  const [modalMessage, setModalMessage] =
+  const [tempPhoto, setTempPhoto] =
     useState("");
 
-  const [isSuccess, setIsSuccess] =
+  const [tempName, setTempName] =
+    useState("");
+
+  const [loading, setLoading] =
     useState(false);
 
-  const [onModalPress, setOnModalPress] =
-    useState<(() => void) | null>(null);
+  const [isEditing, setIsEditing] =
+    useState(false);
+
+  const [showImagePicker, setShowImagePicker] =
+    useState(false);
 
   useEffect(() => {
-    getProfile();
+    fetchProfile();
   }, []);
 
-  const showAlert = (
-    title: string,
-    message: string,
-    success: boolean,
-    action?: () => void
-  ) => {
-    setModalTitle(title);
-    setModalMessage(message);
-    setIsSuccess(success);
-    setShowModal(true);
-    setOnModalPress(() => action || null);
-  };
-
-  const getProfile = async () => {
-    try {
+  const fetchProfile =
+    async () => {
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } =
+        await supabase.auth.getUser();
 
       if (!user) {
-        router.replace("/page/login");
+        router.replace(
+          "/page/login"
+        );
+
         return;
       }
 
-      setUserId(user.id);
+      const { data } =
+        await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+      if (data) {
+        setProfile(data);
 
-      if (error) {
-        console.log(error);
-        return;
+        setFullName(
+          data.full_name || ""
+        );
+
+        setTempName(
+          data.full_name || ""
+        );
+
+        setEmail(
+          data.email || ""
+        );
+
+        setPhoto(
+          data.photo || ""
+        );
+
+        setTempPhoto(
+          data.photo || ""
+        );
       }
+    };
 
-      setEmail(data?.email || "");
+  const pickImage = async () => {
+    const cameraPermission =
+      await ImagePicker.requestCameraPermissionsAsync();
 
-      setSavedName(data?.full_name || "");
-      setFullName(data?.full_name || "");
+    const galleryPermission =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-      setSavedPhoto(data?.photo || null);
-      setPhoto(data?.photo || null);
-    } catch (error) {
-      console.log(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleBack = () => {
-    const hasChanges =
-      fullName !== savedName ||
-      photo !== savedPhoto;
-
-    if (hasChanges) {
-      showAlert(
-        "Discard Changes?",
-        "You have unsaved changes.",
-        false,
-        () => router.back()
+    if (
+      !cameraPermission.granted ||
+      !galleryPermission.granted
+    ) {
+      Alert.alert(
+        "Permission Needed",
+        "Please allow camera and gallery access."
       );
 
       return;
     }
 
-    router.back();
+    setShowImagePicker(true);
   };
 
-  const pickImage = async () => {
-    try {
-      const permissionResult =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+  const saveProfile =
+    async () => {
+      try {
+        setLoading(true);
 
-      if (!permissionResult.granted) {
-        showAlert(
-          "Permission Needed",
-          "Please allow gallery access",
-          false
-        );
-        return;
-      }
+        const {
+          data: { user },
+        } =
+          await supabase.auth.getUser();
 
-      const result =
-        await ImagePicker.launchImageLibraryAsync(
-          {
-            mediaTypes: ["images"],
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.7,
-          }
-        );
+        if (!user) return;
 
-      if (result.canceled) return;
+        let photoUrl = photo;
 
-      const image = result.assets[0];
+        // UPLOAD PHOTO
+        if (
+          tempPhoto &&
+          tempPhoto !== photo
+        ) {
+          const fileExt =
+            tempPhoto
+              .split(".")
+              .pop();
 
-      setPhoto(image.uri);
+          const fileName = `${Date.now()}.${fileExt}`;
 
-      showAlert(
-        "Photo Selected",
-        "Press Save Profile to save your new photo.",
-        true
-      );
-    } catch (error) {
-      console.log(error);
-    }
-  };
+          const filePath = `profiles/${fileName}`;
 
-  const saveProfile = async () => {
-    try {
-      setUploading(true);
+          try {
+            const response =
+              await fetch(
+                tempPhoto
+              );
 
-      let finalPhoto = savedPhoto;
+            const arrayBuffer =
+              await response.arrayBuffer();
 
-      // UPLOAD FOTO BARU
-      if (photo && photo !== savedPhoto) {
-        const response = await fetch(photo);
+            const {
+              error:
+                uploadError,
+            } =
+              await supabase.storage
+                .from("photos")
+                .upload(
+                  filePath,
+                  arrayBuffer,
+                  {
+                    contentType:
+                      "image/jpeg",
 
-        const arrayBuffer =
-          await response.arrayBuffer();
+                    upsert: true,
+                  }
+                );
 
-        const fileExt = photo
-          .split(".")
-          .pop();
+            if (
+              uploadError
+            ) {
+              console.log(
+                "UPLOAD ERROR:",
+                uploadError
+              );
 
-        const fileName = `${Date.now()}.${fileExt}`;
+              Alert.alert(
+                "Upload Failed",
+                uploadError.message
+              );
 
-        const filePath = `photos/${fileName}`;
+              return;
+            }
 
-        const { error: uploadError } =
-          await supabase.storage
-            .from("photos")
-            .upload(
-              filePath,
-              arrayBuffer,
-              {
-                contentType:
-                  "image/jpeg",
-              }
+            const { data } =
+              supabase.storage
+                .from("photos")
+                .getPublicUrl(
+                  filePath
+                );
+
+            photoUrl =
+              data.publicUrl;
+          } catch (error) {
+            console.log(
+              "NETWORK ERROR:",
+              error
             );
 
-        if (uploadError) {
-          showAlert(
-            "Upload Failed",
-            uploadError.message,
-            false
+            Alert.alert(
+              "Network Error",
+              "Failed to upload image."
+            );
+
+            return;
+          }
+        }
+
+        // UPDATE PROFILE
+        const { error } =
+          await supabase
+            .from("profiles")
+            .update({
+              full_name:
+                tempName,
+
+              photo: photoUrl,
+            })
+            .eq("id", user.id);
+
+        if (error) {
+          console.log(error);
+
+          Alert.alert(
+            "Update Failed",
+            error.message
           );
 
           return;
         }
 
-        const { data } =
-          supabase.storage
-            .from("photos")
-            .getPublicUrl(filePath);
+        setFullName(
+          tempName
+        );
 
-        finalPhoto = data.publicUrl;
+        setPhoto(photoUrl);
+
+        setTempPhoto(
+          photoUrl
+        );
+
+        setIsEditing(false);
+
+        Alert.alert(
+          "Success",
+          "Profile updated successfully."
+        );
+
+        fetchProfile();
+      } catch (error) {
+        console.log(error);
+
+        Alert.alert(
+          "Error",
+          "Something went wrong."
+        );
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: fullName,
-          photo: finalPhoto,
-        })
-        .eq("id", userId);
+  const handleBack =
+    () => {
+      const hasChanges =
+        tempName !==
+          fullName ||
+        tempPhoto !== photo;
 
-      if (error) {
-        showAlert(
-          "Update Failed",
-          error.message,
-          false
+      if (
+        isEditing &&
+        hasChanges
+      ) {
+        Alert.alert(
+          "Discard Changes?",
+          "You have unsaved changes.",
+          [
+            {
+              text: "Cancel",
+              style:
+                "cancel",
+            },
+
+            {
+              text:
+                "Discard",
+
+              style:
+                "destructive",
+
+              onPress:
+                () => {
+                  setTempName(
+                    fullName
+                  );
+
+                  setTempPhoto(
+                    photo
+                  );
+
+                  setIsEditing(
+                    false
+                  );
+
+                  router.back();
+                },
+            },
+          ]
         );
 
         return;
       }
 
-      setSavedName(fullName);
-      setSavedPhoto(finalPhoto);
-
-      setPhoto(finalPhoto);
-
-      setIsEditing(false);
-
-      showAlert(
-        "Profile Updated",
-        "Your profile has been updated successfully.",
-        true
-      );
-    } catch (error) {
-      console.log(error);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator
-          size="large"
-          color="#3FA16F"
-        />
-      </View>
-    );
-  }
+      router.back();
+    };
 
   return (
-    <>
-      <ScrollView style={styles.container}>
+    <SafeAreaView
+      style={styles.safe}
+    >
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={
+          false
+        }
+      >
+        {/* HEADER */}
         <LinearGradient
-          colors={["#1F5235", "#2F6B4F"]}
+          colors={[
+            "#1F5235",
+            "#2F6B4F",
+          ]}
           style={styles.header}
         >
+          <View
+            style={
+              styles.orangeCircle
+            }
+          />
+
+          <View
+            style={
+              styles.greenCircle
+            }
+          />
+
+          {/* BACK */}
           <TouchableOpacity
-            style={styles.backButton}
-            onPress={handleBack}
+            style={
+              styles.backButton
+            }
+            onPress={
+              handleBack
+            }
           >
             <Ionicons
               name="chevron-back"
-              size={28}
+              size={24}
               color="#163525"
             />
           </TouchableOpacity>
 
+          <Text style={styles.title}>
+            My Profile
+          </Text>
+
+          {/* PHOTO */}
           <TouchableOpacity
-            onPress={pickImage}
-            activeOpacity={0.8}
-            disabled={!isEditing}
+            activeOpacity={0.85}
+            disabled={
+              !isEditing
+            }
+            onPress={
+              pickImage
+            }
           >
-            {photo ? (
-              <Image
-                source={{ uri: photo }}
-                style={styles.avatar}
-              />
-            ) : (
-              <View
-                style={
-                  styles.defaultAvatar
-                }
-              >
-                <Ionicons
-                  name="person"
-                  size={70}
-                  color="#ffffff"
-                />
-              </View>
-            )}
+            <Image
+              source={{
+                uri:
+                  tempPhoto ||
+                  "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
+              }}
+              style={
+                styles.profileImage
+              }
+            />
 
             {isEditing && (
               <View
-                style={styles.cameraIcon}
+                style={
+                  styles.cameraButton
+                }
               >
                 <Ionicons
                   name="camera"
@@ -317,66 +411,79 @@ export default function ProfileScreen() {
               </View>
             )}
           </TouchableOpacity>
-
-          <Text style={styles.nameText}>
-            {savedName || "New User"}
-          </Text>
-
-          <Text style={styles.emailText}>
-            {email}
-          </Text>
         </LinearGradient>
 
-        <View style={styles.card}>
-          <Text style={styles.label}>
+        {/* FORM */}
+        <View style={styles.form}>
+          {/* NAME */}
+          <Text
+            style={styles.label}
+          >
             Full Name
           </Text>
 
           <TextInput
-            style={[
-              styles.input,
-              !isEditing &&
-                styles.disabledInput,
-            ]}
-            value={fullName}
-            onChangeText={setFullName}
-            placeholder="Enter your full name"
+            style={styles.input}
+            value={
+              isEditing
+                ? tempName
+                : fullName
+            }
+            editable={
+              isEditing
+            }
+            onChangeText={
+              setTempName
+            }
+            placeholder="Your Name"
             placeholderTextColor="#9ca3af"
-            editable={isEditing}
           />
 
-          <Text style={styles.label}>
+          {/* EMAIL */}
+          <Text
+            style={styles.label}
+          >
             Email
           </Text>
 
           <TextInput
             style={[
               styles.input,
-              styles.disabledInput,
+              {
+                backgroundColor:
+                  "#f3f4f6",
+              },
             ]}
             value={email}
             editable={false}
           />
 
+          {/* BUTTON */}
           {isEditing ? (
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={saveProfile}
-              disabled={uploading}
+              onPress={
+                saveProfile
+              }
+              disabled={
+                loading
+              }
             >
               <LinearGradient
                 colors={[
                   "#A9E5BC",
                   "#3FA16F",
                 ]}
-                style={styles.button}
+                style={
+                  styles.button
+                }
               >
                 <Text
                   style={
                     styles.buttonText
                   }
                 >
-                  {uploading
+                  {loading
                     ? "Saving..."
                     : "Save Profile"}
                 </Text>
@@ -386,7 +493,9 @@ export default function ProfileScreen() {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() =>
-                setIsEditing(true)
+                setIsEditing(
+                  true
+                )
               }
             >
               <LinearGradient
@@ -394,7 +503,9 @@ export default function ProfileScreen() {
                   "#1F5235",
                   "#2F6B4F",
                 ]}
-                style={styles.button}
+                style={
+                  styles.button
+                }
               >
                 <Text
                   style={
@@ -409,253 +520,346 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
 
+      {/* IMAGE PICKER MODAL */}
       <Modal
         transparent
-        visible={showModal}
+        visible={
+          showImagePicker
+        }
         animationType="fade"
       >
-        <View style={styles.modalOverlay}>
+        <View
+          style={
+            styles.modalOverlay
+          }
+        >
           <View
-            style={styles.modalContainer}
+            style={
+              styles.imagePickerContainer
+            }
           >
-            <LinearGradient
-              colors={
-                isSuccess
-                  ? [
-                      "#75DFA8",
-                      "#2F9B68",
-                    ]
-                  : [
-                      "#FF826F",
-                      "#B93224",
-                    ]
+            <Text
+              style={
+                styles.modalTitle
               }
-              style={styles.iconWrapper}
             >
-              <Ionicons
-                name={
-                  isSuccess
-                    ? "checkmark"
-                    : "close"
-                }
-                size={34}
-                color="#fff"
-              />
-            </LinearGradient>
-
-            <Text
-              style={styles.modalTitle}
-            >
-              {modalTitle}
+              Choose Photo
             </Text>
 
-            <Text
-              style={styles.modalText}
-            >
-              {modalMessage}
-            </Text>
-
+            {/* CAMERA */}
             <TouchableOpacity
-              onPress={() => {
-                setShowModal(false);
+              style={
+                styles.imageOption
+              }
+              onPress={async () => {
+                setShowImagePicker(
+                  false
+                );
 
-                if (onModalPress) {
-                  onModalPress();
+                const result =
+                  await ImagePicker.launchCameraAsync(
+                    {
+                      allowsEditing: true,
+                      aspect: [
+                        1,
+                        1,
+                      ],
+                      quality: 0.8,
+                    }
+                  );
+
+                if (
+                  !result.canceled
+                ) {
+                  setTempPhoto(
+                    result
+                      .assets[0]
+                      .uri
+                  );
+
+                  Alert.alert(
+                    "Success",
+                    "Photo taken successfully."
+                  );
                 }
               }}
             >
-              <LinearGradient
-                colors={[
-                  "#A9E5BC",
-                  "#3FA16F",
-                ]}
+              <Ionicons
+                name="camera"
+                size={24}
+                color="#3FA16F"
+              />
+
+              <Text
                 style={
-                  styles.modalButton
+                  styles.imageText
                 }
               >
-                <Text
-                  style={
-                    styles.buttonText
-                  }
-                >
-                  OK
-                </Text>
-              </LinearGradient>
+                Open Camera
+              </Text>
+            </TouchableOpacity>
+
+            {/* GALLERY */}
+            <TouchableOpacity
+              style={
+                styles.imageOption
+              }
+              onPress={async () => {
+                setShowImagePicker(
+                  false
+                );
+
+                const result =
+                  await ImagePicker.launchImageLibraryAsync(
+                    {
+                      mediaTypes:
+                        ["images"],
+                      allowsEditing: true,
+                      aspect: [
+                        1,
+                        1,
+                      ],
+                      quality: 0.8,
+                    }
+                  );
+
+                if (
+                  !result.canceled
+                ) {
+                  setTempPhoto(
+                    result
+                      .assets[0]
+                      .uri
+                  );
+
+                  Alert.alert(
+                    "Success",
+                    "Photo selected successfully."
+                  );
+                }
+              }}
+            >
+              <Ionicons
+                name="images"
+                size={24}
+                color="#3FA16F"
+              />
+
+              <Text
+                style={
+                  styles.imageText
+                }
+              >
+                Open Gallery
+              </Text>
+            </TouchableOpacity>
+
+            {/* CANCEL */}
+            <TouchableOpacity
+              style={
+                styles.cancelButton
+              }
+              onPress={() =>
+                setShowImagePicker(
+                  false
+                )
+              }
+            >
+              <Text
+                style={
+                  styles.cancelText
+                }
+              >
+                Cancel
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-    </>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f3f4f6",
-  },
+const styles =
+  StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor:
+        "#f3f4f6",
+    },
 
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+    container: {
+      flex: 1,
+      backgroundColor:
+        "#f3f4f6",
+    },
 
-  header: {
-    alignItems: "center",
-    paddingTop: 70,
-    paddingBottom: 40,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-  },
+    header: {
+      paddingTop: 10,
+      paddingBottom: 35,
+      paddingHorizontal: 20,
+      backgroundColor:
+        "#2F6B4F",
+      borderBottomLeftRadius: 30,
+      borderBottomRightRadius: 30,
+      overflow: "hidden",
+      alignItems: "center",
+    },
 
-  backButton: {
-    position: "absolute",
-    top: 60,
-    left: 20,
-    width: 38,
-    height: 38,
-    borderRadius: 8,
-    backgroundColor:
-      "rgba(255,255,255,0.75)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 100,
-  },
+    orangeCircle: {
+      position: "absolute",
+      width: 220,
+      height: 220,
+      borderRadius: 999,
+      backgroundColor:
+        "#E37059",
+      top: -90,
+      left: -90,
+    },
 
-  avatar: {
-    width: 140,
-    height: 140,
-    borderRadius: 999,
-    borderWidth: 4,
-    borderColor: "#fff",
-  },
+    greenCircle: {
+      position: "absolute",
+      width: 90,
+      height: 90,
+      borderRadius: 999,
+      backgroundColor:
+        "#49BA8B",
+      top: 20,
+      right: 20,
+      opacity: 0.8,
+    },
 
-  defaultAvatar: {
-    width: 140,
-    height: 140,
-    borderRadius: 999,
-    backgroundColor: "#6b7280",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 4,
-    borderColor: "#fff",
-  },
+    backButton: {
+      alignSelf: "flex-start",
+      width: 40,
+      height: 40,
+      borderRadius: 10,
+      backgroundColor:
+        "rgba(255,255,255,0.75)",
+      justifyContent:
+        "center",
+      alignItems: "center",
+      marginBottom: 10,
+    },
 
-  cameraIcon: {
-    position: "absolute",
-    right: 5,
-    bottom: 5,
-    backgroundColor: "#3FA16F",
-    width: 40,
-    height: 40,
-    borderRadius: 999,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+    title: {
+      fontSize: 30,
+      fontWeight: "bold",
+      color: "#fff",
+      marginBottom: 25,
+    },
 
-  nameText: {
-    marginTop: 15,
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#fff",
-  },
+    profileImage: {
+      width: 140,
+      height: 140,
+      borderRadius: 999,
+      borderWidth: 5,
+      borderColor: "#fff",
+    },
 
-  emailText: {
-    marginTop: 6,
-    color: "#d1fae5",
-    fontSize: 15,
-  },
+    cameraButton: {
+      position: "absolute",
+      bottom: 5,
+      right: 5,
+      width: 38,
+      height: 38,
+      borderRadius: 999,
+      backgroundColor:
+        "#3FA16F",
+      justifyContent:
+        "center",
+      alignItems: "center",
+      borderWidth: 3,
+      borderColor: "#fff",
+    },
 
-  card: {
-    margin: 20,
-    backgroundColor: "#fff",
-    borderRadius: 24,
-    padding: 20,
-  },
+    form: {
+      padding: 22,
+    },
 
-  label: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#374151",
-    marginBottom: 8,
-    marginTop: 10,
-  },
+    label: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: "#374151",
+      marginBottom: 8,
+      marginTop: 10,
+    },
 
-  input: {
-    width: "100%",
-    height: 55,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    fontSize: 15,
-    color: "#111827",
-  },
+    input: {
+      width: "100%",
+      height: 56,
+      backgroundColor: "#fff",
+      borderRadius: 16,
+      paddingHorizontal: 16,
+      fontSize: 15,
+      color: "#111827",
+      marginBottom: 14,
+    },
 
-  disabledInput: {
-    backgroundColor: "#e5e7eb",
-  },
+    button: {
+      marginTop: 28,
+      height: 58,
+      borderRadius: 999,
+      justifyContent:
+        "center",
+      alignItems: "center",
+    },
 
-  button: {
-    marginTop: 30,
-    height: 55,
-    borderRadius: 999,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+    buttonText: {
+      color: "#fff",
+      fontSize: 16,
+      fontWeight: "bold",
+    },
 
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor:
+        "rgba(0,0,0,0.45)",
+      justifyContent:
+        "center",
+      alignItems: "center",
+    },
 
-  modalOverlay: {
-    flex: 1,
-    backgroundColor:
-      "rgba(0,0,0,0.45)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
+    imagePickerContainer: {
+      width: 320,
+      backgroundColor:
+        "#296048",
+      borderRadius: 24,
+      padding: 24,
+    },
 
-  modalContainer: {
-    width: 350,
-    backgroundColor: "#296048",
-    borderRadius: 24,
-    paddingVertical: 30,
-    paddingHorizontal: 24,
-    alignItems: "center",
-  },
+    modalTitle: {
+      fontSize: 22,
+      fontWeight: "bold",
+      color: "#fff",
+      textAlign: "center",
+    },
 
-  iconWrapper: {
-    width: 75,
-    height: 75,
-    borderRadius: 999,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 18,
-  },
+    imageOption: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor:
+        "#fff",
+      padding: 16,
+      borderRadius: 16,
+      marginTop: 14,
+    },
 
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 10,
-  },
+    imageText: {
+      marginLeft: 12,
+      fontSize: 15,
+      fontWeight: "600",
+      color: "#1F2937",
+    },
 
-  modalText: {
-    fontSize: 14,
-    color: "#d4ede0",
-    textAlign: "center",
-    marginBottom: 24,
-    lineHeight: 22,
-  },
+    cancelButton: {
+      marginTop: 18,
+      alignItems: "center",
+    },
 
-  modalButton: {
-    width: 130,
-    height: 45,
-    borderRadius: 999,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-});
+    cancelText: {
+      color: "#fff",
+      fontSize: 15,
+      fontWeight: "bold",
+    },
+  });
