@@ -3,45 +3,59 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
-import { router } from "expo-router";
+import {
+    router,
+    useLocalSearchParams,
+} from "expo-router";
+
 import React, {
-  useEffect,
-  useState,
+    useEffect,
+    useState,
 } from "react";
 
 import {
-  Image,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Image,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 import MapView, {
-  Marker,
+    Marker,
 } from "react-native-maps";
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { supabase } from "../services/api";
 
-export default function CreateEvent() {
+export default function EditEvent() {
+  const { id } =
+    useLocalSearchParams();
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [saving, setSaving] =
+    useState(false);
+
   const [eventName, setEventName] =
     useState("");
 
   const [description, setDescription] =
     useState("");
 
+  const [quota, setQuota] =
+    useState("");
+
   const [locationName, setLocationName] =
     useState("");
 
   const [manualLocation, setManualLocation] =
-    useState("");
-
-  const [quota, setQuota] =
     useState("");
 
   const [image, setImage] =
@@ -56,10 +70,16 @@ export default function CreateEvent() {
   const [showTimePicker, setShowTimePicker] =
     useState(false);
 
-  const [loading, setLoading] =
+  const [showImagePicker, setShowImagePicker] =
     useState(false);
 
-  const [showImagePicker, setShowImagePicker] =
+  const [showSaveModal, setShowSaveModal] =
+    useState(false);
+
+  const [showSuccessModal, setShowSuccessModal] =
+    useState(false);
+
+  const [showDiscardModal, setShowDiscardModal] =
     useState(false);
 
   const [region, setRegion] =
@@ -74,294 +94,168 @@ export default function CreateEvent() {
         0.005,
     });
 
-  // MODAL
-  const [showModal, setShowModal] =
-    useState(false);
-
-  const [modalTitle, setModalTitle] =
-    useState("");
-
-  const [modalMessage, setModalMessage] =
-    useState("");
-
-  const [isSuccess, setIsSuccess] =
-    useState(false);
-
-  const [modalAction, setModalAction] =
-    useState<(() => void) | null>(
-      null
-    );
-
   useEffect(() => {
-    getCurrentLocation();
+    fetchEvent();
   }, []);
 
-  const showAlert = (
-    title: string,
-    message: string,
-    success: boolean,
-    action?: () => void
-  ) => {
-    setModalTitle(title);
-
-    setModalMessage(message);
-
-    setIsSuccess(success);
-
-    setShowModal(true);
-
-    setModalAction(
-      () => action || null
-    );
-  };
-
-  // CURRENT LOCATION
-  const getCurrentLocation =
+  const fetchEvent =
     async () => {
       try {
         const {
-          status,
-        } =
-          await Location.requestForegroundPermissionsAsync();
+          data,
+          error,
+        } = await supabase
+          .from("events")
+          .select("*")
+          .eq("id", id)
+          .single();
 
-        if (
-          status !==
-          "granted"
-        ) {
-          return;
-        }
-
-        const currentLocation =
-          await Location.getCurrentPositionAsync(
-            {
-              accuracy:
-                Location.Accuracy.Highest,
-            }
+        if (!error && data) {
+          setEventName(
+            data.name
           );
 
-        const latitude =
-          currentLocation.coords
-            .latitude;
-
-        const longitude =
-          currentLocation.coords
-            .longitude;
-
-        const currentRegion =
-          {
-            latitude,
-            longitude,
-            latitudeDelta:
-              0.005,
-            longitudeDelta:
-              0.005,
-          };
-
-        setRegion(
-          currentRegion
-        );
-
-        const address =
-          await Location.reverseGeocodeAsync(
-            {
-              latitude,
-              longitude,
-            }
+          setDescription(
+            data.description
           );
 
-        if (
-          address.length > 0
-        ) {
-          const place =
-            address[0];
-
-          const locationText =
-            [
-              place.name,
-              place.street,
-              place.district,
-              place.city,
-              place.region,
-              place.country,
-            ]
-              .filter(
-                Boolean
-              )
-              .join(", ");
+          setQuota(
+            String(
+              data.quota
+            )
+          );
 
           setLocationName(
-            locationText
+            data.location
           );
+
+          setManualLocation(
+            data.location
+          );
+
+          setImage(
+            data.image
+          );
+
+          setDate(
+            new Date()
+          );
+
+          setRegion({
+            latitude:
+              data.latitude ||
+              -6.302481,
+
+            longitude:
+              data.longitude ||
+              106.652222,
+
+            latitudeDelta:
+              0.005,
+
+            longitudeDelta:
+              0.005,
+          });
         }
       } catch (error) {
         console.log(error);
+      } finally {
+        setLoading(false);
       }
     };
 
-  const handleBack = () => {
-    const hasChanges =
-      eventName ||
-      description ||
-      locationName ||
-      manualLocation ||
-      image ||
-      quota;
-
-    if (hasChanges) {
-      showAlert(
-        "Discard Changes?",
-        "You have unsaved changes.",
-        false,
-        () => router.back()
-      );
-
-      return;
-    }
-
-    router.back();
-  };
-
-  // IMAGE PICKER
-  const pickImage = async () => {
-    const cameraPermission =
-      await ImagePicker.requestCameraPermissionsAsync();
-
-    const galleryPermission =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (
-      !cameraPermission.granted ||
-      !galleryPermission.granted
-    ) {
-      showAlert(
-        "Permission Needed",
-        "Please allow camera and gallery access.",
-        false
-      );
-
-      return;
-    }
-
-    setShowImagePicker(true);
-  };
-
-  const finalLocation =
-    manualLocation.trim() ||
-    locationName;
-
-  // CREATE EVENT
-  const handleCreateEvent =
+  const pickImage =
     async () => {
-      if (
-        !eventName.trim() ||
-        !description.trim() ||
-        !finalLocation.trim() ||
-        !quota.trim()
-      ) {
-        showAlert(
-          "Create Event Failed",
-          "Please complete all fields.",
-          false
+      setShowImagePicker(
+        true
+      );
+    };
+
+  const uploadImage =
+    async (
+      uri: string
+    ) => {
+      const response =
+        await fetch(uri);
+
+      const blob =
+        await response.blob();
+
+      const fileName = `event-${Date.now()}.jpg`;
+
+      const {
+        error,
+      } = await supabase.storage
+        .from(
+          "event-images"
+        )
+        .upload(
+          fileName,
+          blob,
+          {
+            contentType:
+              "image/jpeg",
+          }
         );
 
-        return;
+      if (error) {
+        console.log(error);
+
+        return null;
       }
 
+      const {
+        data,
+      } = supabase.storage
+        .from(
+          "event-images"
+        )
+        .getPublicUrl(
+          fileName
+        );
+
+      return data.publicUrl;
+    };
+
+  const handleUpdate =
+    async () => {
       try {
-        setLoading(true);
+        setSaving(true);
 
-        const {
-          data: { user },
-        } =
-          await supabase.auth.getUser();
+        let imageUrl =
+          image;
 
-        if (!user) return;
-
-        const {
-          data: profileData,
-          error: profileError,
-        } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-
-        if (profileError) {
-          showAlert(
-            "Profile Error",
-            profileError.message,
-            false
-          );
-
-          return;
-        }
-
-        let imageUrl = null;
-
-        // UPLOAD IMAGE
-        if (image) {
-          const response =
-            await fetch(image);
-
-          const arrayBuffer =
-            await response.arrayBuffer();
-
-          const fileExt =
-            image
-              .split(".")
-              .pop();
-
-          const fileName = `${Date.now()}.${fileExt}`;
-
-          const filePath = `events/${fileName}`;
-
-          const {
-            error:
-              uploadError,
-          } =
-            await supabase.storage
-              .from(
-                "event-images"
-              )
-              .upload(
-                filePath,
-                arrayBuffer,
-                {
-                  contentType:
-                    "image/jpeg",
-                }
-              );
-
-          if (
-            uploadError
-          ) {
-            showAlert(
-              "Upload Failed",
-              uploadError.message,
-              false
+        if (
+          image &&
+          !image.startsWith(
+            "http"
+          )
+        ) {
+          const uploadedImage =
+            await uploadImage(
+              image
             );
 
-            return;
+          if (
+            uploadedImage
+          ) {
+            imageUrl =
+              uploadedImage;
           }
-
-          const { data } =
-            supabase.storage
-              .from(
-                "event-images"
-              )
-              .getPublicUrl(
-                filePath
-              );
-
-          imageUrl =
-            data.publicUrl;
         }
 
-        // INSERT EVENT
-        const { error } =
+        const finalLocation =
+          manualLocation.trim() ||
+          locationName;
+
+        const {
+          error,
+        } =
           await supabase
-            .from("events")
-            .insert({
+            .from(
+              "events"
+            )
+            .update({
               name:
                 eventName,
 
@@ -371,8 +265,6 @@ export default function CreateEvent() {
                 Number(
                   quota
                 ),
-
-              participants_count: 0,
 
               image:
                 imageUrl,
@@ -391,49 +283,50 @@ export default function CreateEvent() {
 
               time:
                 date.toLocaleTimeString(),
+            })
+            .eq(
+              "id",
+              id
+            );
 
-              created_by:
-                user.id,
-
-              created_by_name:
-                profileData?.full_name,
-
-              created_by_photo:
-                profileData?.photo,
-            });
-
-        if (error) {
-          showAlert(
-            "Create Failed",
-            error.message,
+        if (!error) {
+          setShowSaveModal(
             false
           );
 
-          return;
+          setShowSuccessModal(
+            true
+          );
         }
-
-        showAlert(
-          "Event Created",
-          "Your event has been created successfully.",
-          true,
-          () => router.back()
-        );
       } catch (error) {
         console.log(error);
-
-        showAlert(
-          "Error",
-          "Something went wrong.",
-          false
-        );
       } finally {
-        setLoading(false);
+        setSaving(false);
       }
     };
+
+  if (loading) {
+    return (
+      <SafeAreaView
+        style={
+          styles.loadingContainer
+        }
+      >
+        <ActivityIndicator
+          size="large"
+          color="#2F6B4F"
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
       style={styles.safe}
+      edges={[
+        "top",
+        "bottom",
+      ]}
     >
       <ScrollView
         style={
@@ -467,8 +360,10 @@ export default function CreateEvent() {
             style={
               styles.backButton
             }
-            onPress={
-              handleBack
+            onPress={() =>
+              setShowDiscardModal(
+                true
+              )
             }
           >
             <Ionicons
@@ -481,7 +376,7 @@ export default function CreateEvent() {
           <Text
             style={styles.title}
           >
-            Create Event
+            Edit Event
           </Text>
 
           {/* IMAGE */}
@@ -539,14 +434,14 @@ export default function CreateEvent() {
 
           <TextInput
             style={styles.input}
-            placeholder="Business Meetup"
-            placeholderTextColor="#9ca3af"
             value={
               eventName
             }
             onChangeText={
               setEventName
             }
+            placeholder="Business Meetup"
+            placeholderTextColor="#9ca3af"
           />
 
           {/* DATE TIME */}
@@ -708,7 +603,7 @@ export default function CreateEvent() {
             </View>
           </View>
 
-          {/* LOCATION RESULT */}
+          {/* LOCATION */}
           <Text
             style={styles.label}
           >
@@ -725,12 +620,11 @@ export default function CreateEvent() {
                 styles.locationValue
               }
             >
-              {locationName ||
-                "Move map to select location"}
+              {locationName}
             </Text>
           </View>
 
-          {/* MANUAL LOCATION */}
+          {/* MANUAL */}
           <Text
             style={styles.label}
           >
@@ -739,14 +633,14 @@ export default function CreateEvent() {
 
           <TextInput
             style={styles.input}
-            placeholder="ICE BSD, Tangerang"
-            placeholderTextColor="#9ca3af"
             value={
               manualLocation
             }
             onChangeText={
               setManualLocation
             }
+            placeholder="ICE BSD, Tangerang"
+            placeholderTextColor="#9ca3af"
           />
 
           {/* QUOTA */}
@@ -758,13 +652,13 @@ export default function CreateEvent() {
 
           <TextInput
             style={styles.input}
-            placeholder="100"
-            placeholderTextColor="#9ca3af"
             value={quota}
             keyboardType="numeric"
             onChangeText={
               setQuota
             }
+            placeholder="100"
+            placeholderTextColor="#9ca3af"
           />
 
           {/* DESCRIPTION */}
@@ -779,23 +673,25 @@ export default function CreateEvent() {
             style={
               styles.descriptionInput
             }
-            placeholder="Write something about your event..."
-            placeholderTextColor="#9ca3af"
             value={
               description
             }
             onChangeText={
               setDescription
             }
+            placeholder="Write something..."
+            placeholderTextColor="#9ca3af"
           />
 
           {/* BUTTON */}
           <TouchableOpacity
             activeOpacity={
-              0.8
+              0.85
             }
-            onPress={
-              handleCreateEvent
+            onPress={() =>
+              setShowSaveModal(
+                true
+              )
             }
           >
             <LinearGradient
@@ -804,17 +700,17 @@ export default function CreateEvent() {
                 "#3FA16F",
               ]}
               style={
-                styles.createButton
+                styles.saveButton
               }
             >
               <Text
                 style={
-                  styles.buttonText
+                  styles.saveText
                 }
               >
-                {loading
-                  ? "Creating..."
-                  : "Create Event"}
+                {saving
+                  ? "Saving..."
+                  : "Save Changes"}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -869,7 +765,7 @@ export default function CreateEvent() {
         )}
       </ScrollView>
 
-      {/* IMAGE PICKER MODAL */}
+      {/* IMAGE PICKER */}
       <Modal
         transparent
         visible={
@@ -884,7 +780,7 @@ export default function CreateEvent() {
         >
           <View
             style={
-              styles.imagePickerContainer
+              styles.modalContainer
             }
           >
             <Text
@@ -898,7 +794,7 @@ export default function CreateEvent() {
             {/* CAMERA */}
             <TouchableOpacity
               style={
-                styles.imageOption
+                styles.modalOption
               }
               onPress={async () => {
                 setShowImagePicker(
@@ -921,24 +817,18 @@ export default function CreateEvent() {
                       .assets[0]
                       .uri
                   );
-
-                  showAlert(
-                    "Image Selected",
-                    "Photo taken successfully.",
-                    true
-                  );
                 }
               }}
             >
               <Ionicons
                 name="camera"
-                size={24}
+                size={22}
                 color="#3FA16F"
               />
 
               <Text
                 style={
-                  styles.imageText
+                  styles.modalOptionText
                 }
               >
                 Open Camera
@@ -948,7 +838,7 @@ export default function CreateEvent() {
             {/* GALLERY */}
             <TouchableOpacity
               style={
-                styles.imageOption
+                styles.modalOption
               }
               onPress={async () => {
                 setShowImagePicker(
@@ -973,24 +863,18 @@ export default function CreateEvent() {
                       .assets[0]
                       .uri
                   );
-
-                  showAlert(
-                    "Image Selected",
-                    "Banner selected successfully.",
-                    true
-                  );
                 }
               }}
             >
               <Ionicons
                 name="images"
-                size={24}
+                size={22}
                 color="#3FA16F"
               />
 
               <Text
                 style={
-                  styles.imageText
+                  styles.modalOptionText
                 }
               >
                 Open Gallery
@@ -1020,11 +904,11 @@ export default function CreateEvent() {
         </View>
       </Modal>
 
-      {/* MAIN MODAL */}
+      {/* SAVE MODAL */}
       <Modal
         transparent
         visible={
-          showModal
+          showSaveModal
         }
         animationType="fade"
       >
@@ -1035,31 +919,122 @@ export default function CreateEvent() {
         >
           <View
             style={
-              styles.modalContainer
+              styles.confirmModal
             }
           >
             <LinearGradient
-              colors={
-                isSuccess
-                  ? [
-                      "#75DFA8",
-                      "#2F9B68",
-                    ]
-                  : [
-                      "#FF826F",
-                      "#B93224",
-                    ]
-              }
+              colors={[
+                "#A9E5BC",
+                "#3FA16F",
+              ]}
               style={
-                styles.iconWrapper
+                styles.iconCircle
               }
             >
               <Ionicons
-                name={
-                  isSuccess
-                    ? "checkmark"
-                    : "close"
+                name="save"
+                size={32}
+                color="#fff"
+              />
+            </LinearGradient>
+
+            <Text
+              style={
+                styles.confirmTitle
+              }
+            >
+              Save Changes?
+            </Text>
+
+            <Text
+              style={
+                styles.confirmText
+              }
+            >
+              Are you sure you want to update this event?
+            </Text>
+
+            <View
+              style={
+                styles.confirmRow
+              }
+            >
+              <TouchableOpacity
+                style={
+                  styles.cancelAction
                 }
+                onPress={() =>
+                  setShowSaveModal(
+                    false
+                  )
+                }
+              >
+                <Text
+                  style={
+                    styles.cancelActionText
+                  }
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={
+                  handleUpdate
+                }
+              >
+                <LinearGradient
+                  colors={[
+                    "#A9E5BC",
+                    "#3FA16F",
+                  ]}
+                  style={
+                    styles.confirmButton
+                  }
+                >
+                  <Text
+                    style={
+                      styles.confirmButtonText
+                    }
+                  >
+                    Save
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* SUCCESS MODAL */}
+      <Modal
+        transparent
+        visible={
+          showSuccessModal
+        }
+        animationType="fade"
+      >
+        <View
+          style={
+            styles.modalOverlay
+          }
+        >
+          <View
+            style={
+              styles.confirmModal
+            }
+          >
+            <LinearGradient
+              colors={[
+                "#75DFA8",
+                "#2F9B68",
+              ]}
+              style={
+                styles.iconCircle
+              }
+            >
+              <Ionicons
+                name="checkmark"
                 size={34}
                 color="#fff"
               />
@@ -1067,31 +1042,27 @@ export default function CreateEvent() {
 
             <Text
               style={
-                styles.modalTitle
+                styles.confirmTitle
               }
             >
-              {modalTitle}
+              Event Updated
             </Text>
 
             <Text
               style={
-                styles.modalText
+                styles.confirmText
               }
             >
-              {modalMessage}
+              Your event has been updated successfully.
             </Text>
 
             <TouchableOpacity
               onPress={() => {
-                setShowModal(
+                setShowSuccessModal(
                   false
                 );
 
-                if (
-                  modalAction
-                ) {
-                  modalAction();
-                }
+                router.back();
               }}
             >
               <LinearGradient
@@ -1100,18 +1071,120 @@ export default function CreateEvent() {
                   "#3FA16F",
                 ]}
                 style={
-                  styles.modalButton
+                  styles.okButton
                 }
               >
                 <Text
                   style={
-                    styles.buttonText
+                    styles.confirmButtonText
                   }
                 >
                   OK
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* DISCARD MODAL */}
+      <Modal
+        transparent
+        visible={
+          showDiscardModal
+        }
+        animationType="fade"
+      >
+        <View
+          style={
+            styles.modalOverlay
+          }
+        >
+          <View
+            style={
+              styles.confirmModal
+            }
+          >
+            <LinearGradient
+              colors={[
+                "#FF826F",
+                "#B93224",
+              ]}
+              style={
+                styles.iconCircle
+              }
+            >
+              <Ionicons
+                name="warning"
+                size={34}
+                color="#fff"
+              />
+            </LinearGradient>
+
+            <Text
+              style={
+                styles.confirmTitle
+              }
+            >
+              Leave Page?
+            </Text>
+
+            <Text
+              style={
+                styles.confirmText
+              }
+            >
+              Your changes may not be saved.
+            </Text>
+
+            <View
+              style={
+                styles.confirmRow
+              }
+            >
+              <TouchableOpacity
+                style={
+                  styles.cancelAction
+                }
+                onPress={() =>
+                  setShowDiscardModal(
+                    false
+                  )
+                }
+              >
+                <Text
+                  style={
+                    styles.cancelActionText
+                  }
+                >
+                  Stay
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() =>
+                  router.back()
+                }
+              >
+                <LinearGradient
+                  colors={[
+                    "#FF826F",
+                    "#B93224",
+                  ]}
+                  style={
+                    styles.confirmButton
+                  }
+                >
+                  <Text
+                    style={
+                      styles.confirmButtonText
+                    }
+                  >
+                    Leave
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1124,13 +1197,22 @@ const styles =
     safe: {
       flex: 1,
       backgroundColor:
-        "#f3f4f6",
+        "#F3F4F6",
     },
 
     container: {
       flex: 1,
       backgroundColor:
-        "#f3f4f6",
+        "#F3F4F6",
+    },
+
+    loadingContainer: {
+      flex: 1,
+      justifyContent:
+        "center",
+      alignItems: "center",
+      backgroundColor:
+        "#F3F4F6",
     },
 
     header: {
@@ -1299,7 +1381,7 @@ const styles =
       color: "#111827",
     },
 
-    createButton: {
+    saveButton: {
       marginTop: 28,
       height: 56,
       borderRadius: 999,
@@ -1310,7 +1392,7 @@ const styles =
       marginBottom: 30,
     },
 
-    buttonText: {
+    saveText: {
       color: "#fff",
       fontSize: 16,
       fontWeight: "bold",
@@ -1324,22 +1406,69 @@ const styles =
         "center",
       alignItems:
         "center",
+      paddingHorizontal: 20,
     },
 
     modalContainer: {
-      width: 340,
+      width: 320,
       backgroundColor:
         "#296048",
       borderRadius: 24,
+      padding: 24,
+    },
+
+    modalTitle: {
+      fontSize: 22,
+      fontWeight: "bold",
+      color: "#fff",
+      marginBottom: 14,
+      textAlign: "center",
+    },
+
+    modalOption: {
+      flexDirection: "row",
+      alignItems:
+        "center",
+      backgroundColor:
+        "#fff",
+      padding: 16,
+      borderRadius: 16,
+      marginBottom: 14,
+    },
+
+    modalOptionText: {
+      marginLeft: 12,
+      fontSize: 15,
+      fontWeight: "600",
+      color: "#111827",
+    },
+
+    cancelButton: {
+      marginTop: 4,
+      alignItems:
+        "center",
+    },
+
+    cancelText: {
+      color: "#fff",
+      fontSize: 15,
+      fontWeight: "700",
+    },
+
+    confirmModal: {
+      width: 340,
+      backgroundColor:
+        "#296048",
+      borderRadius: 28,
       paddingVertical: 30,
       paddingHorizontal: 24,
       alignItems:
         "center",
     },
 
-    iconWrapper: {
-      width: 75,
-      height: 75,
+    iconCircle: {
+      width: 80,
+      height: 80,
       borderRadius: 999,
       justifyContent:
         "center",
@@ -1348,23 +1477,47 @@ const styles =
       marginBottom: 18,
     },
 
-    modalTitle: {
+    confirmTitle: {
       fontSize: 22,
       fontWeight: "bold",
       color: "#fff",
       marginBottom: 10,
     },
 
-    modalText: {
+    confirmText: {
       fontSize: 14,
-      color: "#d4ede0",
+      color: "#D1FAE5",
       textAlign: "center",
-      marginBottom: 24,
       lineHeight: 22,
+      marginBottom: 24,
     },
 
-    modalButton: {
-      width: 130,
+    confirmRow: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+
+    cancelAction: {
+      width: 110,
+      height: 45,
+      borderRadius: 999,
+      backgroundColor:
+        "#E5E7EB",
+      justifyContent:
+        "center",
+      alignItems:
+        "center",
+      marginRight: 12,
+    },
+
+    cancelActionText: {
+      color: "#111827",
+      fontSize: 15,
+      fontWeight: "700",
+    },
+
+    confirmButton: {
+      width: 110,
       height: 45,
       borderRadius: 999,
       justifyContent:
@@ -1373,41 +1526,19 @@ const styles =
         "center",
     },
 
-    imagePickerContainer: {
-      width: 320,
-      backgroundColor:
-        "#296048",
-      borderRadius: 24,
-      padding: 24,
-    },
-
-    imageOption: {
-      flexDirection: "row",
-      alignItems:
-        "center",
-      backgroundColor:
-        "#fff",
-      padding: 16,
-      borderRadius: 16,
-      marginTop: 14,
-    },
-
-    imageText: {
-      marginLeft: 12,
-      fontSize: 15,
-      fontWeight: "600",
-      color: "#1F2937",
-    },
-
-    cancelButton: {
-      marginTop: 18,
-      alignItems:
-        "center",
-    },
-
-    cancelText: {
+    confirmButtonText: {
       color: "#fff",
       fontSize: 15,
-      fontWeight: "bold",
+      fontWeight: "700",
+    },
+
+    okButton: {
+      width: 120,
+      height: 45,
+      borderRadius: 999,
+      justifyContent:
+        "center",
+      alignItems:
+        "center",
     },
   });

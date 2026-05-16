@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import {
   Dimensions,
   FlatList,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -37,12 +38,18 @@ export default function Home() {
   const [menuOpen, setMenuOpen] =
     useState(false);
 
+  const [refreshing, setRefreshing] =
+    useState(false);
+
   const [
     expandedSection,
     setExpandedSection,
   ] = useState<EventSection | null>(
     null
   );
+
+  const [showLimit, setShowLimit] =
+    useState(5);
 
   const filters =
     useLocalSearchParams<{
@@ -69,10 +76,22 @@ export default function Home() {
         error,
       } = await supabase
         .from("events")
-        .select("*");
+        .select("*")
+        .order("id", {
+          ascending: false,
+        });
 
       if (!error)
         setEvents(data);
+    };
+
+  const onRefresh =
+    async () => {
+      setRefreshing(true);
+
+      await fetchEvents();
+
+      setRefreshing(false);
     };
 
   const fetchRole =
@@ -290,7 +309,7 @@ export default function Home() {
     expandedSection
       ? filterEvents(
           expandedSection
-        )
+        ).slice(0, showLimit)
       : [];
 
   return (
@@ -304,6 +323,16 @@ export default function Home() {
         }
         showsVerticalScrollIndicator={
           false
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={
+              refreshing
+            }
+            onRefresh={
+              onRefresh
+            }
+          />
         }
       >
         <Sidebar
@@ -347,10 +376,16 @@ export default function Home() {
             GatherHub
           </Text>
 
-          <TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={onRefresh}
+            style={
+              styles.refreshButton
+            }
+          >
             <Ionicons
-              name="notifications"
-              size={23}
+              name="refresh"
+              size={18}
               color="#fff"
             />
           </TouchableOpacity>
@@ -363,9 +398,9 @@ export default function Home() {
               styles.heroTitle
             }
           >
-            Discover Amazing
+            Find The
             {"\n"}
-            Events Near You
+            Trending Event
           </Text>
 
           <Text
@@ -373,9 +408,10 @@ export default function Home() {
               styles.subtitle
             }
           >
-            Find trending events,
-            communities, and
-            experiences.
+            Join exciting events
+            and explore
+            communities around
+            you.
           </Text>
         </View>
 
@@ -488,6 +524,55 @@ export default function Home() {
               </TouchableOpacity>
             </View>
 
+            {/* LIMIT */}
+            <View
+              style={
+                styles.limitRow
+              }
+            >
+              <Text
+                style={
+                  styles.limitTitle
+                }
+              >
+                Show:
+              </Text>
+
+              {[5, 10, 25].map(
+                (item) => (
+                  <TouchableOpacity
+                    key={item}
+                    style={[
+                      styles.limitButton,
+                      showLimit ===
+                        item && {
+                        backgroundColor:
+                          "#A9E5BC",
+                      },
+                    ]}
+                    onPress={() =>
+                      setShowLimit(
+                        item
+                      )
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.limitText,
+                        showLimit ===
+                          item && {
+                          color:
+                            "#163525",
+                        },
+                      ]}
+                    >
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              )}
+            </View>
+
             <View
               style={styles.grid}
             >
@@ -551,9 +636,10 @@ export default function Home() {
               </View>
 
               <FlatList
-                data={
-                  popularEvents
-                }
+                data={popularEvents.slice(
+                  0,
+                  5
+                )}
                 horizontal
                 showsHorizontalScrollIndicator={
                   false
@@ -623,9 +709,10 @@ export default function Home() {
               </View>
 
               <FlatList
-                data={
-                  runningEvents
-                }
+                data={runningEvents.slice(
+                  0,
+                  5
+                )}
                 horizontal
                 showsHorizontalScrollIndicator={
                   false
@@ -696,6 +783,17 @@ const styles =
       fontSize: width * 0.08,
       fontWeight: "bold",
       color: "#fff",
+    },
+
+    refreshButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 999,
+      backgroundColor:
+        "rgba(255,255,255,0.18)",
+      justifyContent:
+        "center",
+      alignItems: "center",
     },
 
     hero: {
@@ -809,6 +907,35 @@ const styles =
       fontSize: 14,
       marginTop: 15,
       textAlign: "center",
+    },
+
+    limitRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 24,
+      marginBottom: 18,
+    },
+
+    limitTitle: {
+      color: "#fff",
+      fontWeight: "700",
+      fontSize: 14,
+      marginRight: 12,
+    },
+
+    limitButton: {
+      backgroundColor:
+        "rgba(255,255,255,0.15)",
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: 999,
+      marginRight: 10,
+    },
+
+    limitText: {
+      color: "#fff",
+      fontWeight: "700",
+      fontSize: 13,
     },
 
     circleLeft: {

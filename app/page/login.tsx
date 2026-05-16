@@ -26,6 +26,9 @@ export default function Login() {
   const [password, setPassword] =
     useState("");
 
+  const [showPassword, setShowPassword] =
+    useState(false);
+
   const [emailFocused, setEmailFocused] =
     useState(false);
 
@@ -215,6 +218,7 @@ export default function Login() {
                 />
               </View>
 
+              {/* PASSWORD */}
               <View
                 style={
                   styles.fieldGroup
@@ -226,30 +230,60 @@ export default function Login() {
                   Enter Your Password
                 </Text>
 
-                <TextInput
-                  style={[
-                    styles.input,
-                    passwordFocused &&
-                      styles.inputFocused,
-                  ]}
-                  placeholder="Password....."
-                  placeholderTextColor="#aac4b4"
-                  secureTextEntry
-                  value={password}
-                  onChangeText={
-                    setPassword
-                  }
-                  onFocus={() =>
-                    setPasswordFocused(
-                      true
-                    )
-                  }
-                  onBlur={() =>
-                    setPasswordFocused(
-                      false
-                    )
-                  }
-                />
+                <View>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      passwordFocused &&
+                        styles.inputFocused,
+                      {
+                        paddingRight: 50,
+                      },
+                    ]}
+                    placeholder="Password....."
+                    placeholderTextColor="#aac4b4"
+                    secureTextEntry={
+                      !showPassword
+                    }
+                    value={password}
+                    onChangeText={
+                      setPassword
+                    }
+                    onFocus={() =>
+                      setPasswordFocused(
+                        true
+                      )
+                    }
+                    onBlur={() =>
+                      setPasswordFocused(
+                        false
+                      )
+                    }
+                  />
+
+                  <TouchableOpacity
+                    onPress={() =>
+                      setShowPassword(
+                        !showPassword
+                      )
+                    }
+                    style={{
+                      position: "absolute",
+                      right: 14,
+                      top: 13,
+                    }}
+                  >
+                    <Ionicons
+                      name={
+                        showPassword
+                          ? "eye-off"
+                          : "eye"
+                      }
+                      size={22}
+                      color="#5B7C6F"
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <TouchableOpacity

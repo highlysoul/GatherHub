@@ -1,25 +1,31 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+
 import {
-    router,
-    useLocalSearchParams,
+  router,
+  useLocalSearchParams,
 } from "expo-router";
 
 import {
-    useEffect,
-    useState,
+  useEffect,
+  useState,
 } from "react";
 
+import MapView, {
+  Marker,
+} from "react-native-maps";
+
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -45,12 +51,35 @@ export default function EventDetail() {
   const [joined, setJoined] =
     useState(false);
 
+  const [role, setRole] =
+    useState("");
+
   useEffect(() => {
     if (id) {
       fetchEvent();
       checkJoined();
+      fetchRole();
     }
   }, [id]);
+
+  const fetchRole =
+    async () => {
+      const {
+        data: { user },
+      } =
+        await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const { data } =
+        await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+
+      setRole(data?.role);
+    };
 
   const fetchEvent =
     async () => {
@@ -115,9 +144,7 @@ export default function EventDetail() {
           return;
         }
 
-        if (
-          joined
-        ) {
+        if (joined) {
           Alert.alert(
             "Already Joined",
             "You already joined this event."
@@ -139,7 +166,6 @@ export default function EventDetail() {
           return;
         }
 
-        // INSERT PARTICIPANT
         const {
           error:
             participantError,
@@ -155,10 +181,6 @@ export default function EventDetail() {
         if (
           participantError
         ) {
-          console.log(
-            participantError
-          );
-
           Alert.alert(
             "Join Failed",
             participantError.message
@@ -167,10 +189,7 @@ export default function EventDetail() {
           return;
         }
 
-        // UPDATE COUNT
-        const {
-          error: updateError,
-        } = await supabase
+        await supabase
           .from("events")
           .update({
             participants_count:
@@ -178,14 +197,6 @@ export default function EventDetail() {
                 0) + 1,
           })
           .eq("id", id);
-
-        if (updateError) {
-          console.log(
-            updateError
-          );
-
-          return;
-        }
 
         setJoined(true);
 
@@ -248,7 +259,6 @@ export default function EventDetail() {
             style={styles.image}
           />
 
-          {/* OVERLAY */}
           <LinearGradient
             colors={[
               "transparent",
@@ -428,27 +438,6 @@ export default function EventDetail() {
                   {event?.quota}
                 </Text>
               </View>
-
-              {(event?.participants_count ||
-                0) >=
-                (event?.quota ||
-                  0) &&
-                event?.quota >
-                  0 && (
-                  <View
-                    style={
-                      styles.fullBadge
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.fullText
-                      }
-                    >
-                      FULL
-                    </Text>
-                  </View>
-                )}
             </View>
           </View>
 
@@ -461,8 +450,7 @@ export default function EventDetail() {
             <Image
               source={{
                 uri:
-                  event?.created_by_photo ||
-                  "https://ui-avatars.com/api/?name=User",
+                  event?.created_by_photo,
               }}
               style={
                 styles.creatorImage
@@ -519,73 +507,157 @@ export default function EventDetail() {
             </Text>
           </View>
 
-          {/* JOIN BUTTON */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            disabled={
-              joining ||
-              joined ||
-              (event?.participants_count ||
-                0) >=
-                (event?.quota ||
-                  0)
-            }
-            onPress={
-              handleJoin
+          {/* MAP */}
+          <View
+            style={
+              styles.mapContainer
             }
           >
-            <LinearGradient
-              colors={
+            <Text
+              style={
+                styles.sectionTitle
+              }
+            >
+              Event Location
+            </Text>
+
+            <Text
+              style={
+                styles.locationText
+              }
+            >
+              {event?.location}
+            </Text>
+
+            <MapView
+              style={styles.map}
+              initialRegion={{
+                latitude:
+                  event?.latitude ||
+                  -6.302481,
+
+                longitude:
+                  event?.longitude ||
+                  106.652153,
+
+                latitudeDelta:
+                  0.01,
+
+                longitudeDelta:
+                  0.01,
+              }}
+            >
+              <Marker
+                coordinate={{
+                  latitude:
+                    event?.latitude ||
+                    -6.302481,
+
+                  longitude:
+                    event?.longitude ||
+                    106.652153,
+                }}
+                title={
+                  event?.name
+                }
+                description={
+                  event?.location
+                }
+              />
+            </MapView>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={
+                styles.openMapButton
+              }
+              onPress={() => {
+                Linking.openURL(
+                  `https://www.google.com/maps/search/?api=1&query=${event?.latitude},${event?.longitude}`
+                );
+              }}
+            >
+              <LinearGradient
+                colors={[
+                  "#A9E5BC",
+                  "#3FA16F",
+                ]}
+                style={
+                  styles.mapButtonGradient
+                }
+              >
+                <Ionicons
+                  name="map"
+                  size={18}
+                  color="#fff"
+                />
+
+                <Text
+                  style={
+                    styles.openMapText
+                  }
+                >
+                  Open in Google Maps
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          {/* JOIN BUTTON */}
+          {role !==
+            "admin" && (
+            <TouchableOpacity
+              activeOpacity={
+                0.85
+              }
+              disabled={
+                joining ||
                 joined
-                  ? [
-                      "#5EBA7D",
-                      "#3FA16F",
-                    ]
-                  : (event?.participants_count ||
-                        0) >=
-                      (event?.quota ||
-                        0)
+              }
+              onPress={
+                handleJoin
+              }
+            >
+              <LinearGradient
+                colors={
+                  joined
                     ? [
-                        "#8E8E8E",
-                        "#707070",
+                        "#5EBA7D",
+                        "#3FA16F",
                       ]
                     : [
                         "#A9E5BC",
                         "#3FA16F",
                       ]
-              }
-              style={
-                styles.joinButton
-              }
-            >
-              <Ionicons
-                name={
-                  joined
-                    ? "checkmark-circle"
-                    : "people"
                 }
-                size={20}
-                color="#fff"
-              />
-
-              <Text
                 style={
-                  styles.joinText
+                  styles.joinButton
                 }
               >
-                {joining
-                  ? "Joining..."
-                  : joined
-                    ? "Joined Event"
-                    : (event?.participants_count ||
-                          0) >=
-                        (event?.quota ||
-                          0)
-                      ? "Event Full"
+                <Ionicons
+                  name={
+                    joined
+                      ? "checkmark-circle"
+                      : "people"
+                  }
+                  size={20}
+                  color="#fff"
+                />
+
+                <Text
+                  style={
+                    styles.joinText
+                  }
+                >
+                  {joining
+                    ? "Joining..."
+                    : joined
+                      ? "Joined Event"
                       : "Join Event"}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -725,21 +797,6 @@ const styles =
       width: width * 0.5,
     },
 
-    fullBadge: {
-      marginLeft: "auto",
-      backgroundColor:
-        "#FF6B6B",
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      borderRadius: 999,
-    },
-
-    fullText: {
-      color: "#fff",
-      fontWeight: "bold",
-      fontSize: 10,
-    },
-
     creatorCard: {
       flexDirection: "row",
       alignItems: "center",
@@ -774,7 +831,7 @@ const styles =
       backgroundColor: "#fff",
       borderRadius: 22,
       padding: 18,
-      marginBottom: 24,
+      marginBottom: 18,
     },
 
     sectionTitle: {
@@ -788,6 +845,46 @@ const styles =
       color: "#4B5563",
       fontSize: 14,
       lineHeight: 24,
+    },
+
+    mapContainer: {
+      backgroundColor: "#fff",
+      borderRadius: 22,
+      padding: 18,
+      marginBottom: 20,
+    },
+
+    map: {
+      width: "100%",
+      height: 220,
+      borderRadius: 18,
+      marginTop: 12,
+    },
+
+    locationText: {
+      fontSize: 14,
+      color: "#6B7280",
+      marginTop: 4,
+    },
+
+    openMapButton: {
+      marginTop: 15,
+    },
+
+    mapButtonGradient: {
+      height: 52,
+      borderRadius: 16,
+      flexDirection: "row",
+      justifyContent:
+        "center",
+      alignItems: "center",
+    },
+
+    openMapText: {
+      color: "#fff",
+      fontSize: 15,
+      fontWeight: "700",
+      marginLeft: 8,
     },
 
     joinButton: {
