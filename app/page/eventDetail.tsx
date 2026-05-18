@@ -17,7 +17,6 @@ import MapView, {
 
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Image,
   Linking,
@@ -45,19 +44,12 @@ export default function EventDetail() {
   const [loading, setLoading] =
     useState(true);
 
-  const [joining, setJoining] =
-    useState(false);
-
-  const [joined, setJoined] =
-    useState(false);
-
   const [role, setRole] =
     useState("");
 
   useEffect(() => {
     if (id) {
       fetchEvent();
-      checkJoined();
       fetchRole();
     }
   }, [id]);
@@ -100,116 +92,6 @@ export default function EventDetail() {
         console.log(error);
       } finally {
         setLoading(false);
-      }
-    };
-
-  const checkJoined =
-    async () => {
-      const {
-        data: { user },
-      } =
-        await supabase.auth.getUser();
-
-      if (!user) return;
-
-      const { data } =
-        await supabase
-          .from(
-            "event_participants"
-          )
-          .select("*")
-          .eq("event_id", id)
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-      setJoined(!!data);
-    };
-
-  const handleJoin =
-    async () => {
-      try {
-        setJoining(true);
-
-        const {
-          data: { user },
-        } =
-          await supabase.auth.getUser();
-
-        if (!user) {
-          Alert.alert(
-            "Login Required",
-            "Please login first."
-          );
-
-          return;
-        }
-
-        if (joined) {
-          Alert.alert(
-            "Already Joined",
-            "You already joined this event."
-          );
-
-          return;
-        }
-
-        if (
-          (event?.participants_count ||
-            0) >=
-          (event?.quota || 0)
-        ) {
-          Alert.alert(
-            "Event Full",
-            "This event has reached maximum participants."
-          );
-
-          return;
-        }
-
-        const {
-          error:
-            participantError,
-        } = await supabase
-          .from(
-            "event_participants"
-          )
-          .insert({
-            event_id: id,
-            user_id: user.id,
-          });
-
-        if (
-          participantError
-        ) {
-          Alert.alert(
-            "Join Failed",
-            participantError.message
-          );
-
-          return;
-        }
-
-        await supabase
-          .from("events")
-          .update({
-            participants_count:
-              (event?.participants_count ||
-                0) + 1,
-          })
-          .eq("id", id);
-
-        setJoined(true);
-
-        fetchEvent();
-
-        Alert.alert(
-          "Success",
-          "You joined the event successfully."
-        );
-      } catch (error) {
-        console.log(error);
-      } finally {
-        setJoining(false);
       }
     };
 
@@ -603,43 +485,47 @@ export default function EventDetail() {
             </TouchableOpacity>
           </View>
 
-          {/* JOIN BUTTON */}
+          {/* BUY TICKET BUTTON */}
           {role !==
             "admin" && (
             <TouchableOpacity
               activeOpacity={
                 0.85
               }
-              disabled={
-                joining ||
-                joined
-              }
-              onPress={
-                handleJoin
+              onPress={() =>
+                router.push({
+                  pathname:
+                    "/page/payment",
+                  params: {
+                    eventId: id,
+                    eventName:
+                      event?.name,
+                    eventImage:
+                      event?.image,
+                    eventDate:
+                      event?.date,
+                    eventTime:
+                      event?.time,
+                    eventLocation:
+                      event?.location,
+                    price:
+                      event?.price ||
+                      0,
+                  },
+                })
               }
             >
               <LinearGradient
-                colors={
-                  joined
-                    ? [
-                        "#5EBA7D",
-                        "#3FA16F",
-                      ]
-                    : [
-                        "#A9E5BC",
-                        "#3FA16F",
-                      ]
-                }
+                colors={[
+                  "#A9E5BC",
+                  "#3FA16F",
+                ]}
                 style={
                   styles.joinButton
                 }
               >
                 <Ionicons
-                  name={
-                    joined
-                      ? "checkmark-circle"
-                      : "people"
-                  }
+                  name="ticket"
                   size={20}
                   color="#fff"
                 />
@@ -649,11 +535,7 @@ export default function EventDetail() {
                     styles.joinText
                   }
                 >
-                  {joining
-                    ? "Joining..."
-                    : joined
-                      ? "Joined Event"
-                      : "Join Event"}
+                  {`Buy Ticket  •  $${event?.price || 0}`}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
