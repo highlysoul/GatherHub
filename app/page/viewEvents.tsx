@@ -1,156 +1,80 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-
-import React, {
-    useCallback,
-    useState,
-} from "react";
-
+import React, { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    Modal,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { supabase } from "../services/api";
 
-export default function ManageEvents() {
-  const [events, setEvents] =
-    useState<any[]>([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [refreshing, setRefreshing] =
-    useState(false);
-
-  const [limit, setLimit] =
-    useState(10);
-
-  const [selectedEvent, setSelectedEvent] =
-    useState<any>(null);
-
-  const [showDeleteModal, setShowDeleteModal] =
-    useState(false);
-
-  const [showSuccessModal, setShowSuccessModal] =
-    useState(false);
-
-  const [modalMessage, setModalMessage] =
-    useState("");
+export default function ViewTickets() {
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      fetchMyEvents();
-    }, [limit])
+      fetchTickets();
+    }, []),
   );
 
-  const fetchMyEvents =
-    async () => {
-      try {
-        setLoading(true);
+  const fetchTickets = async () => {
+    try {
+      setLoading(true);
 
-        const {
-          data: { user },
-        } =
-          await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-        if (!user) return;
-
-        const {
-          data,
-          error,
-        } = await supabase
-          .from("events")
-          .select("*")
-          .eq(
-            "created_by",
-            user.id
-          )
-          .order(
-            "created_at",
-            {
-              ascending:
-                false,
-            }
-          )
-          .limit(limit);
-
-        if (!error) {
-          setEvents(
-            data || []
-          );
-        }
-      } catch (error) {
-        console.log(error);
-      } finally {
-        setLoading(false);
-
-        setRefreshing(false);
+      if (!user) {
+        setTickets([]);
+        return;
       }
-    };
 
-  const handleRefresh =
-    async () => {
-      setRefreshing(true);
+      const { data, error } = await supabase
+        .from("tickets")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("id", {
+          ascending: false,
+        });
 
-      await fetchMyEvents();
-    };
-
-  const handleDelete =
-    async () => {
-      try {
-        if (!selectedEvent)
-          return;
-
-        const { error } =
-          await supabase
-            .from("events")
-            .delete()
-            .eq(
-              "id",
-              selectedEvent.id
-            );
-
-        if (!error) {
-          setShowDeleteModal(
-            false
-          );
-
-          setModalMessage(
-            "Event deleted successfully."
-          );
-
-          setShowSuccessModal(
-            true
-          );
-
-          fetchMyEvents();
-        }
-      } catch (error) {
-        console.log(error);
+      if (error) {
+        console.log("Fetch tickets error:", error);
+        setTickets([]);
+        return;
       }
-    };
 
-  const renderItem = ({
-    item,
-  }: any) => (
+      setTickets(data || []);
+    } catch (error) {
+      console.log("Unexpected error:", error);
+      setTickets([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchTickets();
+    setRefreshing(false);
+  };
+
+  const renderTicket = ({ item }: any) => (
     <TouchableOpacity
       activeOpacity={0.9}
       style={styles.card}
       onPress={() =>
         router.push({
-          pathname:
-            "/page/eventDetail",
+          pathname: "/page/ticketDetail",
           params: {
             id: item.id,
           },
@@ -159,925 +83,290 @@ export default function ManageEvents() {
     >
       <Image
         source={{
-          uri:
-            item.image ||
-            "https://images.unsplash.com/photo-1492684223066-81342ee5ff30",
+          uri: item.event_image,
         }}
         style={styles.image}
       />
 
-      <LinearGradient
-        colors={[
-          "transparent",
-          "rgba(0,0,0,0.75)",
-        ]}
-        style={
-          styles.overlay
-        }
-      />
-
-      <View
-        style={
-          styles.cardContent
-        }
-      >
-        <View
-          style={
-            styles.badge
-          }
-        >
+      <View style={styles.cardBody}>
+        <View style={styles.statusBadge}>
           <Ionicons
-            name="calendar"
-            size={12}
+            name={item.status === "used" ? "checkmark-done" : "ticket"}
+            size={11}
             color="#fff"
           />
-
-          <Text
-            style={
-              styles.badgeText
-            }
-          >
-            {item.date}
-          </Text>
+          <Text style={styles.statusText}>{item.status?.toUpperCase()}</Text>
         </View>
 
-        <Text
-          numberOfLines={2}
-          style={
-            styles.title
-          }
-        >
-          {item.name}
+        <Text style={styles.title} numberOfLines={2}>
+          {item.event_name}
         </Text>
 
-        <View
-          style={
-            styles.infoRow
-          }
-        >
-          <Ionicons
-            name="location"
-            size={14}
-            color="#fff"
-          />
-
-          <Text
-            numberOfLines={1}
-            style={
-              styles.infoText
-            }
-          >
-            {item.location}
+        <View style={styles.row}>
+          <Ionicons name="calendar" size={13} color="#A0D7C6" />
+          <Text style={styles.infoText}>
+            {item.event_date}
+            {"  •  "}
+            {item.event_time}
           </Text>
         </View>
 
-        <View
-          style={
-            styles.bottomRow
-          }
-        >
-          <View
-            style={
-              styles.participantBox
-            }
-          >
-            <Ionicons
-              name="people"
-              size={14}
-              color="#fff"
-            />
+        <View style={styles.row}>
+          <Ionicons name="location" size={13} color="#A0D7C6" />
+          <Text style={styles.infoText} numberOfLines={1}>
+            {item.event_location}
+          </Text>
+        </View>
 
-            <Text
-              style={
-                styles.participantText
-              }
-            >
-              {
-                item.participants_count
-              }
-              /
-              {item.quota}
-            </Text>
-          </View>
+        <View style={styles.footer}>
+          <Text style={styles.codeText}>{item.ticket_code}</Text>
 
-          <View
-            style={
-              styles.actionRow
-            }
-          >
-            {/* EDIT */}
-            <TouchableOpacity
-              style={
-                styles.actionButton
-              }
-              onPress={() =>
-                router.push({
-                  pathname:
-                    "/page/editEvent",
-                  params: {
-                    id: item.id,
-                  },
-                })
-              }
-            >
-              <Ionicons
-                name="create"
-                size={18}
-                color="#fff"
-              />
-            </TouchableOpacity>
-
-            {/* DELETE */}
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                {
-                  backgroundColor:
-                    "#DC2626",
-                },
-              ]}
-              onPress={() => {
-                setSelectedEvent(
-                  item
-                );
-
-                setShowDeleteModal(
-                  true
-                );
-              }}
-            >
-              <Ionicons
-                name="trash"
-                size={18}
-                color="#fff"
-              />
-            </TouchableOpacity>
+          <View style={styles.viewButton}>
+            <Text style={styles.viewText}>View</Text>
+            <Ionicons name="arrow-forward" size={14} color="#fff" />
           </View>
         </View>
       </View>
     </TouchableOpacity>
   );
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#fff" />
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView
-      style={styles.safe}
-      edges={[
-        "top",
-        "bottom",
-      ]}
-    >
-      <View
-        style={
-          styles.container
-        }
-      >
-        {/* HEADER */}
-        <LinearGradient
-          colors={[
-            "#1F5235",
-            "#2F6B4F",
-          ]}
-          style={styles.header}
-        >
-          <View
-            style={
-              styles.orangeCircle
-            }
-          />
-
-          <View
-            style={
-              styles.greenCircle
-            }
-          />
-
-          <View
-            style={
-              styles.headerRow
-            }
-          >
-            <TouchableOpacity
-              style={
-                styles.backButton
-              }
-              onPress={() =>
-                router.back()
-              }
-            >
-              <Ionicons
-                name="chevron-back"
-                size={24}
-                color="#163525"
-              />
-            </TouchableOpacity>
-
-            <Text
-              style={
-                styles.headerTitle
-              }
-            >
-              My Events
-            </Text>
-          </View>
-
-          <Text
-            style={
-              styles.headerSubtitle
-            }
-          >
-            Manage all your created events
-          </Text>
-        </LinearGradient>
-
-        {/* FILTER */}
-        <View
-          style={
-            styles.filterRow
-          }
-        >
-          <Text
-            style={
-              styles.filterTitle
-            }
-          >
-            Show:
-          </Text>
-
-          {[10, 25].map(
-            (item) => (
-              <TouchableOpacity
-                key={item}
-                style={[
-                  styles.limitButton,
-                  limit ===
-                    item && {
-                    backgroundColor:
-                      "#2F6B4F",
-                  },
-                ]}
-                onPress={() =>
-                  setLimit(
-                    item
-                  )
-                }
-              >
-                <Text
-                  style={[
-                    styles.limitText,
-                    limit ===
-                      item && {
-                      color:
-                        "#fff",
-                    },
-                  ]}
-                >
-                  {item}
-                </Text>
-              </TouchableOpacity>
-            )
-          )}
-        </View>
-
-        {/* CONTENT */}
-        {loading ? (
-          <View
-            style={
-              styles.loadingContainer
-            }
-          >
-            <ActivityIndicator
-              size="large"
-              color="#2F6B4F"
-            />
-          </View>
-        ) : (
-          <FlatList
-            data={events}
-            keyExtractor={(
-              item
-            ) =>
-              item.id.toString()
-            }
-            renderItem={
-              renderItem
-            }
-            showsVerticalScrollIndicator={
-              false
-            }
-            contentContainerStyle={{
-              padding: 20,
-              paddingBottom: 120,
-            }}
-            refreshControl={
-              <RefreshControl
-                refreshing={
-                  refreshing
-                }
-                onRefresh={
-                  handleRefresh
-                }
-                colors={[
-                  "#2F6B4F",
-                ]}
-              />
-            }
-            ListEmptyComponent={
-              <View
-                style={
-                  styles.emptyContainer
-                }
-              >
-                <Ionicons
-                  name="calendar-outline"
-                  size={80}
-                  color="#9CA3AF"
-                />
-
-                <Text
-                  style={
-                    styles.emptyTitle
-                  }
-                >
-                  No Events Yet
-                </Text>
-
-                <Text
-                  style={
-                    styles.emptyText
-                  }
-                >
-                  You haven't created any events.
-                </Text>
-              </View>
-            }
-          />
-        )}
-
-        {/* FLOAT BUTTON */}
+    <SafeAreaView style={styles.safe}>
+      {/* HEADER */}
+      <View style={styles.header}>
         <TouchableOpacity
-          activeOpacity={0.85}
-          style={
-            styles.fab
-          }
-          onPress={() =>
-            router.push(
-              "/page/createEvent"
-            )
-          }
+          onPress={() => router.back()}
+          style={styles.backButton}
         >
-          <LinearGradient
-            colors={[
-              "#A9E5BC",
-              "#3FA16F",
-            ]}
-            style={
-              styles.fabGradient
-            }
-          >
-            <Ionicons
-              name="add"
-              size={30}
-              color="#fff"
-            />
-          </LinearGradient>
+          <Ionicons name="chevron-back" size={22} color="#fff" />
         </TouchableOpacity>
 
-        {/* DELETE MODAL */}
-        <Modal
-          transparent
-          visible={
-            showDeleteModal
-          }
-          animationType="fade"
-        >
-          <View
-            style={
-              styles.modalOverlay
-            }
-          >
-            <View
-              style={
-                styles.modalContainer
-              }
-            >
-              <LinearGradient
-                colors={[
-                  "#FF826F",
-                  "#B93224",
-                ]}
-                style={
-                  styles.modalIcon
-                }
-              >
-                <Ionicons
-                  name="trash"
-                  size={34}
-                  color="#fff"
-                />
-              </LinearGradient>
+        <Text style={styles.headerTitle}>My Tickets</Text>
 
-              <Text
-                style={
-                  styles.modalTitle
-                }
-              >
-                Delete Event?
-              </Text>
-
-              <Text
-                style={
-                  styles.modalText
-                }
-              >
-                This action cannot be undone.
-              </Text>
-
-              <View
-                style={
-                  styles.modalRow
-                }
-              >
-                <TouchableOpacity
-                  style={
-                    styles.cancelButton
-                  }
-                  onPress={() =>
-                    setShowDeleteModal(
-                      false
-                    )
-                  }
-                >
-                  <Text
-                    style={
-                      styles.cancelText
-                    }
-                  >
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={
-                    handleDelete
-                  }
-                >
-                  <LinearGradient
-                    colors={[
-                      "#FF826F",
-                      "#B93224",
-                    ]}
-                    style={
-                      styles.deleteButton
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.deleteText
-                      }
-                    >
-                      Delete
-                    </Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* SUCCESS MODAL */}
-        <Modal
-          transparent
-          visible={
-            showSuccessModal
-          }
-          animationType="fade"
-        >
-          <View
-            style={
-              styles.modalOverlay
-            }
-          >
-            <View
-              style={
-                styles.modalContainer
-              }
-            >
-              <LinearGradient
-                colors={[
-                  "#75DFA8",
-                  "#2F9B68",
-                ]}
-                style={
-                  styles.modalIcon
-                }
-              >
-                <Ionicons
-                  name="checkmark"
-                  size={34}
-                  color="#fff"
-                />
-              </LinearGradient>
-
-              <Text
-                style={
-                  styles.modalTitle
-                }
-              >
-                Success
-              </Text>
-
-              <Text
-                style={
-                  styles.modalText
-                }
-              >
-                {modalMessage}
-              </Text>
-
-              <TouchableOpacity
-                onPress={() =>
-                  setShowSuccessModal(
-                    false
-                  )
-                }
-              >
-                <LinearGradient
-                  colors={[
-                    "#A9E5BC",
-                    "#3FA16F",
-                  ]}
-                  style={
-                    styles.okButton
-                  }
-                >
-                  <Text
-                    style={
-                      styles.okText
-                    }
-                  >
-                    OK
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
+        <View style={{ width: 38 }} />
       </View>
+
+      <FlatList
+        data={tickets}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={renderTicket}
+        contentContainerStyle={
+          tickets.length === 0
+            ? {
+                flexGrow: 1,
+              }
+            : styles.list
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#fff"
+          />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="ticket-outline" size={72} color="#A0D7C6" />
+
+            <Text style={styles.emptyTitle}>No Tickets Yet</Text>
+
+            <Text style={styles.emptySubtitle}>
+              Browse events and purchase your first ticket.
+            </Text>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => router.push("/page/home")}
+              style={{
+                marginTop: 20,
+              }}
+            >
+              <LinearGradient
+                colors={["#A9E5BC", "#3FA16F"]}
+                style={styles.browseButton}
+              >
+                <Text style={styles.browseText}>Browse Events</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        }
+      />
     </SafeAreaView>
   );
 }
 
-const styles =
-  StyleSheet.create({
-    safe: {
-      flex: 1,
-      backgroundColor:
-        "#F3F4F6",
-    },
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: "#2F6B4F",
+  },
 
-    container: {
-      flex: 1,
-      backgroundColor:
-        "#F3F4F6",
-    },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#2F6B4F",
+  },
 
-    header: {
-      paddingHorizontal: 20,
-      paddingTop: 10,
-      paddingBottom: 30,
-      borderBottomLeftRadius: 30,
-      borderBottomRightRadius: 30,
-      overflow: "hidden",
-    },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+  },
 
-    orangeCircle: {
-      position: "absolute",
-      width: 220,
-      height: 220,
-      borderRadius: 999,
-      backgroundColor:
-        "#E37059",
-      top: -90,
-      left: -90,
-    },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
-    greenCircle: {
-      position: "absolute",
-      width: 90,
-      height: 90,
-      borderRadius: 999,
-      backgroundColor:
-        "#49BA8B",
-      top: 20,
-      right: 20,
-      opacity: 0.8,
-    },
+  headerTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "bold",
+  },
 
-    headerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
+  list: {
+    padding: 20,
+    paddingBottom: 40,
+  },
 
-    backButton: {
-      width: 42,
-      height: 42,
-      borderRadius: 12,
-      backgroundColor:
-        "rgba(255,255,255,0.8)",
-      justifyContent:
-        "center",
-      alignItems: "center",
-      marginRight: 14,
-    },
+  card: {
+    backgroundColor: "#1E4D3A",
+    borderRadius: 22,
+    marginBottom: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
 
-    headerTitle: {
-      fontSize: 28,
-      fontWeight: "bold",
-      color: "#fff",
-    },
+  image: {
+    width: "100%",
+    height: 140,
+  },
 
-    headerSubtitle: {
-      marginTop: 12,
-      color: "#D1FAE5",
-      fontSize: 14,
-    },
+  cardBody: {
+    padding: 16,
+  },
 
-    filterRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: 20,
-      paddingTop: 20,
-    },
+  statusBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(244,162,97,0.95)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    marginBottom: 8,
+  },
 
-    filterTitle: {
-      fontSize: 15,
-      fontWeight: "700",
-      color: "#111827",
-      marginRight: 12,
-    },
+  statusText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+    marginLeft: 4,
+  },
 
-    limitButton: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      backgroundColor:
-        "#E5E7EB",
-      borderRadius: 999,
-      marginRight: 10,
-    },
+  title: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
 
-    limitText: {
-      fontSize: 14,
-      fontWeight: "700",
-      color: "#374151",
-    },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
 
-    loadingContainer: {
-      flex: 1,
-      justifyContent:
-        "center",
-      alignItems: "center",
-    },
+  infoText: {
+    marginLeft: 6,
+    color: "#D1FAE5",
+    fontSize: 12,
+    flex: 1,
+  },
 
-    card: {
-      height: 260,
-      borderRadius: 28,
-      overflow: "hidden",
-      marginBottom: 20,
-      backgroundColor:
-        "#000",
-    },
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    borderStyle: "dashed",
+  },
 
-    image: {
-      width: "100%",
-      height: "100%",
-      position: "absolute",
-    },
+  codeText: {
+    color: "#A0D7C6",
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 1,
+  },
 
-    overlay: {
-      position: "absolute",
-      width: "100%",
-      height: "100%",
-    },
+  viewButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#3FA16F",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
 
-    cardContent: {
-      flex: 1,
-      justifyContent:
-        "flex-end",
-      padding: 18,
-    },
+  viewText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+    marginRight: 4,
+  },
 
-    badge: {
-      alignSelf: "flex-start",
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor:
-        "rgba(244,162,97,0.95)",
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 999,
-      marginBottom: 10,
-    },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 30,
+  },
 
-    badgeText: {
-      color: "#fff",
-      fontSize: 11,
-      fontWeight: "bold",
-      marginLeft: 5,
-    },
+  emptyTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "bold",
+    marginTop: 16,
+  },
 
-    title: {
-      fontSize: 22,
-      fontWeight: "bold",
-      color: "#fff",
-      marginBottom: 10,
-    },
+  emptySubtitle: {
+    color: "#A0D7C6",
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 8,
+    lineHeight: 22,
+  },
 
-    infoRow: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
+  browseButton: {
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 999,
+  },
 
-    infoText: {
-      color: "#fff",
-      fontSize: 13,
-      marginLeft: 6,
-      flex: 1,
-    },
-
-    bottomRow: {
-      marginTop: 16,
-      flexDirection: "row",
-      justifyContent:
-        "space-between",
-      alignItems: "center",
-    },
-
-    participantBox: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor:
-        "rgba(255,255,255,0.18)",
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 999,
-    },
-
-    participantText: {
-      color: "#fff",
-      fontSize: 13,
-      fontWeight: "700",
-      marginLeft: 6,
-    },
-
-    actionRow: {
-      flexDirection: "row",
-    },
-
-    actionButton: {
-      width: 42,
-      height: 42,
-      borderRadius: 999,
-      backgroundColor:
-        "#3FA16F",
-      justifyContent:
-        "center",
-      alignItems: "center",
-      marginLeft: 10,
-    },
-
-    fab: {
-      position: "absolute",
-      bottom: 30,
-      right: 24,
-    },
-
-    fabGradient: {
-      width: 65,
-      height: 65,
-      borderRadius: 999,
-      justifyContent:
-        "center",
-      alignItems: "center",
-      elevation: 8,
-    },
-
-    emptyContainer: {
-      marginTop: 100,
-      justifyContent:
-        "center",
-      alignItems: "center",
-    },
-
-    emptyTitle: {
-      fontSize: 22,
-      fontWeight: "bold",
-      color: "#111827",
-      marginTop: 20,
-    },
-
-    emptyText: {
-      fontSize: 14,
-      color: "#6B7280",
-      marginTop: 8,
-      textAlign: "center",
-    },
-
-    modalOverlay: {
-      flex: 1,
-      backgroundColor:
-        "rgba(0,0,0,0.45)",
-      justifyContent:
-        "center",
-      alignItems: "center",
-      paddingHorizontal: 20,
-    },
-
-    modalContainer: {
-      width: "100%",
-      maxWidth: 340,
-      backgroundColor:
-        "#296048",
-      borderRadius: 28,
-      paddingVertical: 30,
-      paddingHorizontal: 24,
-      alignItems: "center",
-    },
-
-    modalIcon: {
-      width: 80,
-      height: 80,
-      borderRadius: 999,
-      justifyContent:
-        "center",
-      alignItems: "center",
-      marginBottom: 18,
-    },
-
-    modalTitle: {
-      fontSize: 22,
-      fontWeight: "bold",
-      color: "#fff",
-      marginBottom: 10,
-    },
-
-    modalText: {
-      fontSize: 14,
-      color: "#D1FAE5",
-      textAlign: "center",
-      lineHeight: 22,
-      marginBottom: 24,
-    },
-
-    modalRow: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-
-    cancelButton: {
-      width: 110,
-      height: 45,
-      borderRadius: 999,
-      backgroundColor:
-        "#E5E7EB",
-      justifyContent:
-        "center",
-      alignItems: "center",
-      marginRight: 12,
-    },
-
-    cancelText: {
-      color: "#111827",
-      fontSize: 15,
-      fontWeight: "700",
-    },
-
-    deleteButton: {
-      width: 110,
-      height: 45,
-      borderRadius: 999,
-      justifyContent:
-        "center",
-      alignItems: "center",
-    },
-
-    deleteText: {
-      color: "#fff",
-      fontSize: 15,
-      fontWeight: "700",
-    },
-
-    okButton: {
-      width: 120,
-      height: 45,
-      borderRadius: 999,
-      justifyContent:
-        "center",
-      alignItems: "center",
-    },
-
-    okText: {
-      color: "#fff",
-      fontSize: 15,
-      fontWeight: "700",
-    },
-  });
+  browseText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+});
