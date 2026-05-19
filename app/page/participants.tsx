@@ -69,7 +69,7 @@ export default function Participants() {
 
       return {
         ...participant,
-        full_name: profile?.full_name || ticket?.user_email || `Participant ${index + 1}`,
+        full_name: profile?.full_name || profile?.email || ticket?.user_email || `Participant ${index + 1}`,
         email: profile?.email || ticket?.user_email || "-",
         ticket_code: ticket?.ticket_code || "-",
         status: ticket?.status || "active",
