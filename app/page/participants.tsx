@@ -5,13 +5,13 @@ import { router, useLocalSearchParams } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../services/api";
@@ -27,63 +27,63 @@ export default function Participants() {
   }, []);
 
   const fetchParticipants = async () => {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const { data: participantsData, error: participantsError } =
-        await supabase
-          .from("event_participants")
-          .select("*")
-          .eq("event_id", Number(params.eventId));
-
-      if (participantsError) {
-        console.log("Participants error:", participantsError);
-        setParticipants([]);
-        return;
-      }
-
-      if (!participantsData || participantsData.length === 0) {
-        setParticipants([]);
-        return;
-      }
-
-      const { data: ticketsData, error: ticketsError } = await supabase
-        .from("tickets")
+    const { data: participantsData, error: participantsError } =
+      await supabase
+        .from("event_participants")
         .select("*")
         .eq("event_id", Number(params.eventId));
 
-      console.log("Tickets:", ticketsData);
-      console.log("Tickets error:", ticketsError);
+    if (participantsError) {
+      console.log("Participants error:", participantsError);
+      setParticipants([]);
+      return;
+    }
 
-      const mergedData = participantsData.map(
-        (participant: any, index: number) => {
-          const ticket = ticketsData?.find(
-            (t: any) => String(t.user_id) === String(participant.user_id),
-          );
+    if (!participantsData || participantsData.length === 0) {
+      setParticipants([]);
+      return;
+    }
 
-          return {
-            ...participant,
-            full_name:
-              ticket?.user_name ||
-              ticket?.customer_name ||
-              `Participant ${index + 1}`,
-            email: ticket?.user_email || ticket?.email || "-",
-            ticket_code: ticket?.ticket_code || "-",
-            status: ticket?.status || "active",
-          };
-        },
+    const userIds = participantsData.map((p: any) => p.user_id);
+
+    const { data: profilesData } = await supabase
+      .from("profiles")
+      .select("*")
+      .in("id", userIds);
+
+    const { data: ticketsData } = await supabase
+      .from("tickets")
+      .select("*")
+      .eq("event_id", Number(params.eventId));
+
+    const mergedData = participantsData.map((participant: any, index: number) => {
+      const profile = profilesData?.find(
+        (p: any) => String(p.id) === String(participant.user_id)
+      );
+      const ticket = ticketsData?.find(
+        (t: any) => String(t.user_id) === String(participant.user_id)
       );
 
-      console.log("Merged participants:", mergedData);
+      return {
+        ...participant,
+        full_name: profile?.full_name || ticket?.user_email || `Participant ${index + 1}`,
+        email: profile?.email || ticket?.user_email || "-",
+        ticket_code: ticket?.ticket_code || "-",
+        status: ticket?.status || "active",
+      };
+    });
 
-      setParticipants(mergedData);
-    } catch (error) {
-      console.log("Fetch participants catch:", error);
-      setParticipants([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setParticipants(mergedData);
+  } catch (error) {
+    console.log("Fetch participants catch:", error);
+    setParticipants([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const exportCSV = async () => {
     try {
